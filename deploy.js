@@ -11,20 +11,28 @@ const byteCode = compiledCode.contracts[':KingOfTheEtherThrone'].bytecode
 const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
 //console.log('options=', options);
 VotingContract.new(options, function (err, contract) {
-    if (contract.address)
-        console.log('address=', contract.address);
+    if (err) {
+        console.error(err);
+    }
+    if (!contract.address) {
+        return;
+    }
+    console.log('address=', contract.address);
     const inst = VotingContract.at(contract.address);
     //console.log('contractInstance, ', contractInstance);
-    setTimeout(() => {
+    setTimeout(function () {
         console.log('chainging to', web3.eth.accounts[1])
         contract.claimThrone.sendTransaction('Brent', {
-            value: 100,
-            from: web3.eth.accounts[1]
+            value: 1,
+            from: web3.eth.accounts[1],
+            gas: 1000000
         }, function (err, result) {
+            if (err) {
+                console.error(err);
+            }
             if (!result) {
                 return;
             }
-            console.log('done', arguments[1]);
             const monarch = contract.currentMonarch.call();
             console.log('monarch=', monarch);
         })
