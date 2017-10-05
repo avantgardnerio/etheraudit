@@ -10,31 +10,32 @@ const VotingContract = web3.eth.contract(abiDefinition)
 const byteCode = compiledCode.contracts[':KingOfTheEtherThrone'].bytecode
 const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
 //console.log('options=', options);
-VotingContract.new(options, function (err, contract) {
-    if (err) {
-        console.error(err);
-    }
-    if (!contract.address) {
-        return;
-    }
-    console.log('address=', contract.address);
-    const inst = VotingContract.at(contract.address);
-    //console.log('contractInstance, ', contractInstance);
-    setTimeout(function () {
+
+(async () => {
+    try {
+        const contract = await new Promise((resolve, reject) => {
+            VotingContract.new(options, (err, contract) => {
+                if (err) reject(err);
+                else if (contract.address) resolve(contract);
+                else console.log('processing...')
+            });
+        });
         console.log('chainging to', web3.eth.accounts[1])
-        contract.claimThrone.sendTransaction('Brent', {
-            value: 1,
-            from: web3.eth.accounts[1],
-            gas: 1000000
-        }, function (err, result) {
-            if (err) {
-                console.error(err);
-            }
-            if (!result) {
-                return;
-            }
-            const monarch = contract.currentMonarch.call();
-            console.log('monarch=', monarch);
-        })
-    }, 100)
-});
+        const txId = await new Promise((resolve, reject) => {
+            contract.claimThrone.sendTransaction('Brent', {
+                value: 1,
+                from: web3.eth.accounts[1],
+                gas: 1000000
+            }, (err, txId) => {
+                if (err) reject(err);
+                else if (txId) resolve(txId);
+                else console.log('processing...')
+            })
+        });
+        console.log('txId=', txId);
+        const monarch = contract.currentMonarch.call();
+        console.log('monarch=', monarch);
+    } catch (err) {
+        console.log(err);
+    }
+})()
