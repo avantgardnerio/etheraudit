@@ -20,21 +20,30 @@ const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
                 else console.log('processing...')
             });
         });
-        console.log('chainging to', web3.eth.accounts[1])
-        const txId = await new Promise((resolve, reject) => {
-            contract.claimThrone.sendTransaction('Brent', {
-                value: 1,
-                from: web3.eth.accounts[1],
-                gas: 1000000
-            }, (err, txId) => {
-                if (err) reject(err);
-                else if (txId) resolve(txId);
-                else console.log('processing...')
+
+        const takeThrone = (msg, amount, address) => {
+            console.log('chainging to', address)
+            return new Promise((resolve, reject) => {
+                contract.claimThrone.sendTransaction(msg, {
+                    value: amount,
+                    from: address,
+                    gas: 1000000
+                }, (err, txId) => {
+                    if (err) reject(err);
+                    else if (txId) resolve(txId);
+                    else console.log('processing...')
+                })
             })
-        });
-        console.log('txId=', txId);
-        const monarch = contract.currentMonarch.call();
+        }
+
+        await takeThrone('Brent', 1, web3.eth.accounts[1]);
+        let monarch = contract.currentMonarch.call();
         console.log('monarch=', monarch);
+
+        await takeThrone('Justin', 2, web3.eth.accounts[2]);
+        monarch = contract.currentMonarch.call();
+        console.log('monarch=', monarch);
+
     } catch (err) {
         console.log(err);
     }
