@@ -2,7 +2,8 @@
   "scripts": {
     "server": "testrpc",
     "deploy": "node deploy.js",
-    "accounts": "node accounts.js"
+    "accounts": "node accounts.js",
+    "clean": "rm .node-xmlhttp*"
   },
   "dependencies": {
     "ethereumjs-testrpc": "^4.1.3",

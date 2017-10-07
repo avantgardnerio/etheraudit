@@ -1,2 +1,7 @@
 # node
 node_modules/
+.node*
+
+# ethereum
+geth/
+keystore/

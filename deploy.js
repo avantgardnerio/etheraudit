@@ -1,15 +1,22 @@
 const fs = require('fs');
 const solc = require('solc');
 const Web3 = require('web3');
-const web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
 const code = fs.readFileSync('KingOfTheEtherThrone.sol').toString()
 const compiledCode = solc.compile(code)
 const abiDefinition = JSON.parse(compiledCode.contracts[':KingOfTheEtherThrone'].interface)
 const VotingContract = web3.eth.contract(abiDefinition)
 const byteCode = compiledCode.contracts[':KingOfTheEtherThrone'].bytecode
-const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
-//console.log('options=', options);
+const from = web3.eth.accounts[0].substring(2);
+const options = {
+    data: '0x' + byteCode,
+    from: web3.eth.accounts[0],
+    gas: 2100000//4700000
+};
+console.log('options=', options);
+
+console.log('balance=', web3.eth.getBalance(web3.eth.accounts[0]).toString());
 
 (async () => {
     try {
@@ -20,6 +27,7 @@ const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
                 else console.log('processing...')
             });
         });
+        console.log('contract address=', contract.address);
 
         const takeThrone = (msg, amount, address) => {
             console.log('chainging to', address)
@@ -36,13 +44,14 @@ const options = { data: byteCode, from: web3.eth.accounts[0], gas: 4700000 };
             })
         }
 
-        await takeThrone('Brent', 1, web3.eth.accounts[1]);
+        await takeThrone('Brent', 1, web3.eth.accounts[0]);
         let monarch = contract.currentMonarch.call();
-        console.log('monarch=', monarch);
+        let balance = web3.fromWei(web3.eth.getBalance(web3.eth.accounts[0]));
+        console.log(`monarch=${monarch} brent=${balance}`);
 
-        await takeThrone('Justin', 2, web3.eth.accounts[2]);
-        monarch = contract.currentMonarch.call();
-        console.log('monarch=', monarch);
+        // await takeThrone('Justin', 2, web3.eth.accounts[2]);
+        // monarch = contract.currentMonarch.call();
+        // console.log('monarch=', monarch);
 
     } catch (err) {
         console.log(err);
