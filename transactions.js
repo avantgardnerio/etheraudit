@@ -15,9 +15,12 @@ for (let i = 1000050; i < web3.eth.syncing.currentBlock; i++) {
             if (txn.input.length < 10) continue;
             accounts[txn.from] = accounts[txn.from] | 0;
             if (txn.to) accounts[txn.to] = accounts[txn.to] | 0;
-            console.log('txn=', txn);
+            //console.log('txn=', txn);
             const rcpt = web3.eth.getTransactionReceipt(txn.hash);
-            console.log('rcpt=', rcpt);
+            //console.log('rcpt=', rcpt);
+            if (rcpt.contractAddress) {
+                console.log(`contract @ ${rcpt.contractAddress}: ${txn.input}`)
+            }
         }
     }
 }
