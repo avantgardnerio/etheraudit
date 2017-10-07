@@ -45,6 +45,21 @@ struct CFInstruction {
     std::vector<CFStackEntry> operands;
     void print() {
         printOpCode(data.data(), offset, opCode);
+
+        if(operands.size()> 0) {
+            printf("\t\t");
+            for (size_t i = 0; i < operands.size(); i++) {
+                if(operands[i].isConstant) {
+                    for(auto& b : operands[i].constantValue) {
+                        printf(" %02x", b);
+                    }
+                } else {
+                    printf(" <#%lu>", operands[i].fromOffset[0]);
+                }
+                printf(",");
+            }
+            printf("\n");
+        }
     }
 };
 
@@ -54,10 +69,29 @@ class Program {
     std::map<size_t, std::shared_ptr<CFInstruction>> instructions;
 
     void fillInstructions() {
+        std::vector<CFStackEntry> stack;
+
         OpCodes::iterate(byteCode, [&](const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode){
             instructions[pos] = std::make_shared<CFInstruction>(pos, opCode);
             for(size_t i = 0;i < opCode.length;i++) {
                 instructions[pos]->data.push_back( data[i]);
+            }
+
+            for(size_t i = 0;i <opCode.stackRemoved;i++) {
+                instructions[pos]->operands.emplace_back(stack.back());
+                stack.pop_back();
+            }
+
+            for(size_t i = 0;i < opCode.stackAdded;i++) {
+                CFStackEntry entry;
+                entry.fromOffset.push_back(pos);
+                if(opCode.opCode >= OpCodes::PUSH1.opCode &&
+                        opCode.opCode <= OpCodes::PUSH32.opCode) {
+                    entry.isConstant = true;
+                    assert(instructions[pos]->data.size());
+                    entry.constantValue = instructions[pos]->data;
+                }
+                stack.push_back(entry);
             }
         });
     }
@@ -71,7 +105,7 @@ class Program {
             if(currNode.start == (size_t)-1){
                 currNode.start = instruction.offset;
             }
-            currNode.end = instruction.offset;
+            currNode.end = instruction.offset + 1;
             if(instruction.opCode.isBranch()) {
                 nodes.emplace_back(std::make_shared<CFNode>(currNode));
                 currNode = CFNode();
@@ -91,6 +125,10 @@ class Program {
         }
     }
 public:
+    const std::map<size_t, std::shared_ptr<CFInstruction>> &Instructions() const {
+        return instructions;
+    }
+
     Program(std::vector<uint8_t> byteCode) : byteCode(byteCode) {
         fillInstructions();
         fillGraph();
@@ -101,6 +139,8 @@ public:
         for(auto& node : nodes) {
             if(node->isJumpDest) {
                 printf("loc_%ld:\n", node->idx);
+            } else {
+                printf("/*%ld:/*\n", node->idx);
             }
             for(size_t i = node->start;i < node->end;i++) {
                 if(instructions[i])
@@ -147,6 +187,7 @@ int main(int argc, const char**argv) {
   //printByteCode(bc);
 
   Program p(bc);
-    p.print();
+  p.print();
+  auto pt = p.Instructions().find(70)->second.get();
   return 0;
 }
