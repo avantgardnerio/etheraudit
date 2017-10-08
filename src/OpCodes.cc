@@ -57,7 +57,14 @@ int OpCodes::OpCode::swapNum() const {
     return classNum(opCode, OpCodes::SWAP1, OpCodes::SWAP16);
 }
 
+int OpCodes::OpCode::pushNum() const {
+    return classNum(opCode, OpCodes::PUSH1, OpCodes::PUSH32);
+}
+
 bool OpCodes::OpCode::isArithmetic() const {
+    if(opCode == OP_EXP)
+        return false; // It will overflow
+    
     if(opCode >= OpCodes::OP_ADD && opCode < OpCodes::OP_SHA3)
         return true;
 
@@ -105,4 +112,19 @@ int64_t OpCodes::OpCode::Solve(const std::vector<int64_t> &input) const {
             assert(false && "Please add the logic!");
     }
     return 0;
+}
+
+bool OpCodes::OpCode::isStackManipulatorOnly() const {
+    if(swapNum() != -1)
+            return true;
+    if(dupNum() != -1)
+            return true;
+    if(pushNum() != -1)
+            return true;
+    switch(opCode) {
+            case OP_POP:
+                    return true;
+                default:
+                    return false;
+            }
 }

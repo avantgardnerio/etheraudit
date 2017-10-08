@@ -250,7 +250,7 @@ public:
                 printf("/*%ld:/*\n", node->idx);
             }
             for(size_t i = node->start;i < node->end;i++) {
-                if(instructions[i])
+                if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
                     instructions[i]->print();
             }
         }

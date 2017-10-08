@@ -18,6 +18,8 @@ namespace OpCodes {
         bool isBranch() const;
         int dupNum() const;
         int swapNum() const;
+        int pushNum() const;
+        bool isStackManipulatorOnly() const;
 
         int64_t Solve(const std::vector<int64_t>& input) const;
         bool isArithmetic() const;
