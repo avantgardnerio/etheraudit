@@ -16,6 +16,11 @@ namespace OpCodes {
         OpCode(const OpCode&) = delete;
 
         bool isBranch() const;
+        int dupNum() const;
+        int swapNum() const;
+
+        int64_t Solve(const std::vector<int64_t>& input) const;
+        bool isArithmetic() const;
 
         bool operator==(const OpCode &rhs) const;
 
@@ -23,7 +28,8 @@ namespace OpCodes {
     };
 
 #define XX(NAME, OPCODE, STACKREQ, STACKADD, BYTE_LENGTH) \
-    extern const OpCode NAME;
+    extern const OpCode NAME;\
+    static const uint8_t OP_ ## NAME = OPCODE;
 #include "opcodes_xx.h"
 
     const OpCode& get(uint8_t opCode);

@@ -4,6 +4,8 @@
 #include <iostream>
 #include <memory>
 #include <map>
+#include <sstream>
+#include <algorithm>
 
 #include "OpCodes.h"
 
@@ -27,10 +29,68 @@ struct CFNode {
     std::vector<std::shared_ptr<CFNode>> next;
 };
 
+std::string toString(const std::vector<uint8_t>& data) {
+    std::stringstream ss;
+    ss.width(2);
+    ss.fill('0');
+    bool isFirst = true;
+    for(auto& d : data) {
+        if(!isFirst)
+            ss << " ";
+        ss << std::hex << (uint32_t)d;
+        isFirst = false;
+    }
+    return ss.str();
+}
+std::vector<uint8_t> getVecFromInt64(int64_t _v) {
+    uint64_t v = static_cast<uint64_t>(_v);
+    std::vector<uint8_t> rtn;
+    if(_v < 0)
+        for(size_t i = 0;i < 24;i++)
+            rtn.push_back(0xff);
+
+    while(v) {
+        rtn.push_back(v & 0xff);
+        v = v >> 8;
+    }
+    std::reverse(rtn.begin(), rtn.end());
+    return rtn;
+}
+bool getInt64FromVec(const std::vector<uint8_t>& data, int64_t *rtn) {
+    if(data.size() > 8)
+        return false;
+
+    int64_t v = 0;
+    for(auto& d : data) {
+        v = v << 8;
+        v += d;
+    }
+    if(rtn)
+        *rtn = v;
+
+    return true;
+}
+
 struct CFStackEntry {
-    std::vector<size_t> fromOffset;
+    size_t globalIdx;
     bool isConstant = false;
     std::vector<uint8_t> constantValue;
+
+    bool getConstantInt(int64_t* v) {
+        if(!isConstant)
+            return false;
+
+        return getInt64FromVec(constantValue, v);
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry) {
+        if(entry.isConstant) {
+            os << toString(entry.constantValue);
+        } else {
+            os << "<#" << entry.globalIdx << ">";
+        }
+        return os;
+    }
 };
 
 struct CFInstruction {
@@ -43,22 +103,62 @@ struct CFInstruction {
                                                                                                     data(data) {}
 
     std::vector<CFStackEntry> operands;
+    std::vector<CFStackEntry> outputs;
+
+    void simplify() {
+        if(opCode.dupNum() != -1) {
+            outputs[0] = operands.back();
+            for(auto i = 1;i < outputs.size();i++) {
+                outputs[i] = operands[i-1];
+            }
+        } else if(opCode.swapNum() != -1) {
+            for(auto i = 0;i < outputs.size();i++) {
+                outputs[i] = operands[i];
+            }
+            std::swap(outputs[0], outputs[outputs.size()-1]);
+        }
+
+        if(opCode.isArithmetic()) {
+            bool allInputsConstant = true;
+            std::vector<int64_t> inputs;
+
+            for(auto& i : operands) {
+                int64_t o = 0;
+                allInputsConstant &= i.getConstantInt(&o);
+                inputs.push_back(o);
+            }
+
+            if(allInputsConstant) {
+                outputs[0].isConstant = true;
+                outputs[0].constantValue = getVecFromInt64(opCode.Solve(inputs));
+            }
+        }
+    }
+
     void print() {
         printOpCode(data.data(), offset, opCode);
+        std::stringstream ss;
+        if(operands.size() > 0 || outputs.size() > 0) {
+            ss << "\t\t " << opCode.name << "(";
 
-        if(operands.size()> 0) {
-            printf("\t\t");
             for (size_t i = 0; i < operands.size(); i++) {
-                if(operands[i].isConstant) {
-                    for(auto& b : operands[i].constantValue) {
-                        printf(" %02x", b);
-                    }
-                } else {
-                    printf(" <#%lu>", operands[i].fromOffset[0]);
-                }
-                printf(",");
+                ss << operands[i];
+                if(i != operands.size() - 1)
+                    ss << ", ";
             }
-            printf("\n");
+            ss << ")";
+            if(outputs.size()) {
+                ss << " = (";
+                for(size_t i = 0;i < outputs.size();i++) {
+                    ss << outputs[i];
+                    if(i != outputs.size() - 1) {
+                        ss << ", ";
+                    }
+                }
+                ss << ")";
+            }
+            ss << "\n";
+            printf("%s", ss.str().c_str());
         }
     }
 };
@@ -70,13 +170,14 @@ class Program {
 
     void fillInstructions() {
         std::vector<CFStackEntry> stack;
-
+        size_t globalIdx = 0;
         OpCodes::iterate(byteCode, [&](const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode){
             instructions[pos] = std::make_shared<CFInstruction>(pos, opCode);
             for(size_t i = 0;i < opCode.length;i++) {
                 instructions[pos]->data.push_back( data[i]);
             }
 
+            auto stackBack = stack.end();
             for(size_t i = 0;i <opCode.stackRemoved;i++) {
                 instructions[pos]->operands.emplace_back(stack.back());
                 stack.pop_back();
@@ -84,15 +185,21 @@ class Program {
 
             for(size_t i = 0;i < opCode.stackAdded;i++) {
                 CFStackEntry entry;
-                entry.fromOffset.push_back(pos);
+                entry.globalIdx = globalIdx++;
                 if(opCode.opCode >= OpCodes::PUSH1.opCode &&
                         opCode.opCode <= OpCodes::PUSH32.opCode) {
                     entry.isConstant = true;
                     assert(instructions[pos]->data.size());
                     entry.constantValue = instructions[pos]->data;
                 }
-                stack.push_back(entry);
+                instructions[pos]->outputs.emplace_back(entry);
             }
+
+            instructions[pos]->simplify();
+            for(auto& o : instructions[pos]->outputs) {
+                stack.push_back(o);
+            }
+
         });
     }
 
