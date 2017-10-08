@@ -8,3 +8,11 @@ keystore/
 
 # cpp
 build/
+cmake-build-debug
+
+# IDEs
+.idea/
+*.ipr
+*.iml
+*.iws
+.vscode

@@ -6,10 +6,16 @@ Ethereum Contract Auditor
 
 Use fuzzing and static code analysis to find bugs in ethereum smart contracts.
 
+# Prereqs
+- CMake >= 3.7
+- g++ >= 7.0
+
 ## Setup
 
 ```bash
 yarn install
+cd src && mkdir -p build && cd build && cmake ..
+make
 ```
 
 ## Running
