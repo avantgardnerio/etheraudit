@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <sstream>
+#include <cstring>
 #include "assert.h"
 
 
@@ -164,4 +165,18 @@ bool OpCodes::OpCode::isStop() const {
            opCode == OP_RETURN ||
            opCode == OP_INVALID ||
            opCode == OP_SUICIDE;
+}
+
+bool OpCodes::OpCode::isFallThrough() const {
+    if(isStop())
+        return false;
+
+    if(opCode == OP_JUMP)
+        return false;
+
+    return true;
+}
+
+bool OpCodes::OpCode::isUnknown() const {
+    return strncmp(name.c_str(), "UNKNOWN", strlen("UNKNOWN") - 1) == 0;
 }

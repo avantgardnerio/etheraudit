@@ -17,7 +17,9 @@ namespace OpCodes {
         OpCode& operator=(const OpCode&) = delete;
         OpCode(const OpCode&) = delete;
 
+        bool isFallThrough() const;
         bool isBranch() const;
+        bool isUnknown() const;
         int dupNum() const;
         int swapNum() const;
         int pushNum() const;

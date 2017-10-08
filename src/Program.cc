@@ -2,6 +2,7 @@
 // Created by justin on 10/7/17.
 //
 
+#include <set>
 #include "Program.h"
 
 static void printOpCode(const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode) {
@@ -193,18 +194,20 @@ void Program::fillInstructions() {
     });
 }
 
-void Program::fillGraph() {
-    size_t idx = 0;
+void Program::initGraph() {
+    size_t idx = 1;
     CFNode currNode;
+    currNode.isReachable = true;
 
     for(auto& inst : instructions) {
         auto& instruction = *inst.second;
         if(currNode.start == (size_t)-1){
             currNode.start = instruction.offset;
         }
-        currNode.end = instruction.offset + 1;
-        if(instruction.opCode.isBranch()) {
-            nodes.emplace_back(std::make_shared<CFNode>(currNode));
+        currNode.end = instruction.offset + 1 + instruction.opCode.length;
+        if(instruction.opCode.isBranch() ||
+                instruction.opCode.isStop()) {
+            nodes[currNode.start] = std::make_shared<CFNode>(currNode);
             currNode = CFNode();
             currNode.start = currNode.end = (size_t)-1;
             currNode.idx = idx++;
@@ -213,7 +216,7 @@ void Program::fillGraph() {
                 currNode.isJumpDest = true;
             } else {
                 currNode.end--;
-                nodes.emplace_back(std::make_shared<CFNode>(currNode));
+                nodes[currNode.start] = std::make_shared<CFNode>(currNode);
                 currNode = CFNode();
                 currNode.start = currNode.end = instruction.offset;
                 currNode.isJumpDest = true;
@@ -223,22 +226,86 @@ void Program::fillGraph() {
     }
 
     if(currNode.start != -1) {
-        nodes.emplace_back(std::make_shared<CFNode>(currNode));
+        nodes[currNode.start] = std::make_shared<CFNode>(currNode);
+    }
+}
+
+void Program::startGraph() {
+    std::set< size_t > seen;
+    std::vector< size_t > todo;
+
+    todo.push_back(0);
+    while(!todo.empty()) {
+        auto pos = todo.back(); todo.pop_back();
+
+        if(seen.find(pos) != seen.end())
+            continue;
+        seen.insert(pos);
+
+        auto node = nodes[pos];
+        assert(node);
+        auto lastInstr = node->lastInstruction(*this);
+        assert(lastInstr);
+        node->isReachable = true;
+
+        if( lastInstr->opCode.isFallThrough()) {
+            auto& next = nodes[ node->end];
+            assert(next);
+            node->next.push_back(next);
+            next->prev.push_back(node);
+            todo.push_back(node->end);
+        }
+
+        if( lastInstr->opCode.opCode == OpCodes::OP_JUMPI ||
+                lastInstr->opCode.opCode == OpCodes::OP_JUMP) {
+            assert(!lastInstr->operands.empty());
+            auto& jumpTo = lastInstr->operands.front();
+            int64_t nextAddr = 0;
+            if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
+                auto& next = nodes[ nextAddr ];
+                assert(next);
+                node->next.push_back(next);
+                next->prev.push_back(node);
+                todo.push_back(nextAddr);
+            }
+        }
+
     }
 }
 
 Program::Program(std::vector<uint8_t> byteCode) : byteCode(byteCode) {
     fillInstructions();
-    fillGraph();
+    initGraph();
+    startGraph();
 }
 
 void Program::print() {
     printf("entry:\n");
-    for(auto& node : nodes) {
+    for(auto& pr : nodes) {
+        auto& node = pr.second;
         if(node->isJumpDest) {
             printf("loc_%ld:\n", node->idx);
         } else {
             printf("/*%ld:/*\n", node->idx);
+        }
+        if(!node->isReachable && node->hasUnknownOpCodes(*this)) {
+            printf("/* Possible data section: */\n");
+            for(auto i = node->start;i < node->end;i++ ) {
+                if((i - node->start) % 16 == 0 && i != node->start)
+                    printf("\n");
+                printf("%02x ", byteCode[i]);
+            }
+            continue;
+        }
+
+        if(!node->isReachable) {
+            printf("/*Unreachable*/\n");
+        } else {
+            std::stringstream ss;
+            for(auto& n : node->prev) {
+                ss << n->idx << " ";
+            }
+            printf("/*Reachable from %s*/\n", ss.str().c_str());
         }
         for(size_t i = node->start;i < node->end;i++) {
             if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
@@ -246,4 +313,34 @@ void Program::print() {
                 instructions[i]->print();
         }
     }
+}
+
+std::shared_ptr<CFInstruction> CFNode::lastInstruction(const Program& p) const {
+    for(size_t last = end - 1; last >= start; last--) {
+        auto it = p.Instructions().find(last);
+        if(it != p.Instructions().end()) {
+            return it->second;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<std::shared_ptr<CFInstruction>> CFNode::Instructions(const Program &p) const {
+    std::vector<std::shared_ptr<CFInstruction>> rtn;
+    for(size_t i = start; i < end; i++) {
+        auto it = p.Instructions().find(i);
+        if(it != p.Instructions().end()) {
+            rtn.push_back(it->second);
+        }
+    }
+    return rtn;
+}
+
+bool CFNode::hasUnknownOpCodes(const Program &p) const {
+    auto instrs = Instructions(p);
+    for(auto& instr : instrs) {
+        if(instr->opCode.isUnknown())
+            return true;
+    }
+    return false;
 }
