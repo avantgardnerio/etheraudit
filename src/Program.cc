@@ -80,6 +80,45 @@ std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry) {
     return os;
 }
 
+bool CFStackEntry::operator==(const CFStackEntry &rhs) const {
+    return idx == rhs.idx &&
+           label == rhs.label &&
+           isConstant == rhs.isConstant &&
+           constantValue == rhs.constantValue;
+}
+
+bool CFStackEntry::operator!=(const CFStackEntry &rhs) const {
+    return !(rhs == *this);
+}
+
+bool CFStackEntry::operator<(const CFStackEntry &rhs) const {
+    if (idx < rhs.idx)
+        return true;
+    if (rhs.idx < idx)
+        return false;
+    if (label < rhs.label)
+        return true;
+    if (rhs.label < label)
+        return false;
+    if (isConstant < rhs.isConstant)
+        return true;
+    if (rhs.isConstant < isConstant)
+        return false;
+    return constantValue < rhs.constantValue;
+}
+
+bool CFStackEntry::operator>(const CFStackEntry &rhs) const {
+    return rhs < *this;
+}
+
+bool CFStackEntry::operator<=(const CFStackEntry &rhs) const {
+    return !(rhs < *this);
+}
+
+bool CFStackEntry::operator>=(const CFStackEntry &rhs) const {
+    return !(*this < rhs);
+}
+
 CFInstruction::CFInstruction(size_t offset, const OpCodes::OpCode &opCode, const std::vector<uint8_t> &data) : offset(offset),
                                                                                                                opCode(opCode),
                                                                                                                data(data) {}
@@ -262,14 +301,92 @@ void Program::startGraph() {
             auto& jumpTo = lastInstr->operands.front();
             int64_t nextAddr = 0;
             if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
-                auto& next = nodes[ nextAddr ];
-                assert(next);
-                node->next.push_back(next);
-                next->prev.push_back(node);
-                todo.push_back(nextAddr);
+                if(auto& next = nodes[ nextAddr ]) {
+                    node->next.push_back(next);
+                    next->prev.push_back(node);
+                    todo.push_back(nextAddr);
+                }
             }
         }
 
+    }
+}
+
+void Program::solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node) {
+    std::map< CFStack, std::vector<executionPath> > possibleStackStarts;
+
+    for(auto& p : node->prev) {
+        for(auto& s : node->possibleStackStates) {
+            auto path = s.second;
+            for(auto& p : path) {
+                p.push_back(node->idx);
+                possibleStackStarts[s.first].push_back(p);
+            }
+        }
+    }
+
+    auto instructions = node->Instructions(*this);
+
+    for(auto& _possibleStackStart : possibleStackStarts) {
+        auto stack = _possibleStackStart.first;
+
+        for(auto& instruction : instructions) {
+            auto& opCode = instruction->opCode;
+            auto pos = instruction->offset;
+
+            instructions[pos]->operands.clear();
+            instructions[pos]->outputs.clear();
+
+            auto stackBack = stack.end();
+            for (size_t i = 0; i < opCode.stackRemoved; i++) {
+                instructions[pos]->operands.emplace_back(stack.back());
+                stack.pop_back();
+            }
+
+            for (size_t i = 0; i < opCode.stackAdded; i++) {
+                CFStackEntry entry;
+                entry.idx = globalIdx++;
+                if (opCode.opCode >= OpCodes::PUSH1.opCode &&
+                    opCode.opCode <= OpCodes::PUSH32.opCode) {
+                    entry.isConstant = true;
+                    assert(instructions[pos]->data.size());
+                    entry.constantValue = instructions[pos]->data;
+                }
+                instructions[pos]->outputs.emplace_back(entry);
+            }
+
+            instructions[pos]->simplify();
+            for (auto &o : instructions[pos]->outputs) {
+                stack.push_back(o);
+            }
+        }
+
+        //possibleStackStarts[stack].push_back(_possibleStackStart.second);
+    }
+}
+
+void Program::solveStack() {
+    std::set< size_t > seen;
+    std::vector< size_t > todo;
+    size_t globalIdx = 0;
+
+    todo.push_back(0);
+    while(!todo.empty()) {
+        auto pos = todo.back();
+        todo.pop_back();
+
+        if (seen.find(pos) != seen.end())
+            continue;
+        seen.insert(pos);
+
+        auto node = nodes[pos];
+        assert(node);
+
+        solveStack(globalIdx, node);
+
+        for(auto& n : node->next) {
+            todo.push_back(n->idx);
+        }
     }
 }
 
@@ -277,12 +394,16 @@ Program::Program(std::vector<uint8_t> byteCode) : byteCode(byteCode) {
     fillInstructions();
     initGraph();
     startGraph();
+    //solveStack();
 }
 
 void Program::print() {
     printf("entry:\n");
     for(auto& pr : nodes) {
         auto& node = pr.second;
+        if(!node)
+            continue;
+        
         if(node->isJumpDest) {
             printf("loc_%ld:\n", node->idx);
         } else {

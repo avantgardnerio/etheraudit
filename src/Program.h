@@ -10,6 +10,31 @@
 struct CFInstruction;
 struct Program;
 
+struct CFStackEntry {
+    size_t idx;
+    std::string label = "";
+    bool isConstant = false;
+    std::vector<uint8_t> constantValue;
+
+    bool getConstantInt(int64_t* v);
+
+    friend std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry);
+
+    bool operator==(const CFStackEntry &rhs) const;
+
+    bool operator!=(const CFStackEntry &rhs) const;
+
+    bool operator<(const CFStackEntry &rhs) const;
+
+    bool operator>(const CFStackEntry &rhs) const;
+
+    bool operator<=(const CFStackEntry &rhs) const;
+
+    bool operator>=(const CFStackEntry &rhs) const;
+};
+typedef std::vector<CFStackEntry> CFStack;
+typedef std::vector<size_t> executionPath;
+
 struct CFNode {
     size_t start = 0,
             end = 0;
@@ -24,17 +49,8 @@ struct CFNode {
     std::vector<std::shared_ptr<CFInstruction>> Instructions(const Program& p) const;
     bool hasUnknownOpCodes(const Program& p) const;
     std::shared_ptr<CFInstruction> lastInstruction(const Program& p) const;
-};
 
-struct CFStackEntry {
-    size_t idx;
-    std::string label = "";
-    bool isConstant = false;
-    std::vector<uint8_t> constantValue;
-
-    bool getConstantInt(int64_t* v);
-
-    friend std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry);
+    std::map< CFStack, std::vector<executionPath> > possibleStackStates;
 };
 
 struct CFInstruction {
@@ -71,4 +87,8 @@ public:
     void print();
 
     void startGraph();
+
+    void solveStack();
+
+    void solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node);
 };
