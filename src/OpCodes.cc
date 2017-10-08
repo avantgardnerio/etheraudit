@@ -1,12 +1,17 @@
 #include "OpCodes.h"
 #include <iostream>
 #include <cmath>
+#include <memory>
+#include <map>
+#include <sstream>
 #include "assert.h"
 
 
 #define XX(NAME, OPCODE, STACKREQ, STACKADD, BYTE_LENGTH) \
 const OpCodes::OpCode OpCodes::NAME(OPCODE, #NAME, STACKREQ, STACKADD, BYTE_LENGTH);
 #include "opcodes_xx.h"
+
+std::map<size_t, std::unique_ptr<OpCodes::OpCode>> unknownOpCodes;
 
 const OpCodes::OpCode& OpCodes::get(uint8_t opCode) {
     switch(opCode) {
@@ -17,8 +22,17 @@ break;\
 }
 #include "opcodes_xx.h"
         default: {
-            std::cerr << "Unknown opcode: 0x" << std::hex << (uint32_t)opCode << std::endl;
-            assert(false);
+            if(unknownOpCodes[opCode] == 0) {
+                std::stringstream ss;
+                ss << "UNKNOWN(";
+                ss.width(2);
+                ss.fill('0');
+                ss << std::hex << (uint32_t)opCode << ")";
+                unknownOpCodes[opCode] = std::make_unique<OpCodes::OpCode>(opCode, ss.str());
+            }
+            return *unknownOpCodes[opCode];
+            //std::cerr << "Unknown opcode: 0x" << std::hex << (uint32_t)opCode << std::endl;
+            //assert(false);
         }
     }
 
@@ -143,4 +157,11 @@ bool OpCodes::OpCode::isStackManipulatorOnly() const {
                 default:
                     return false;
             }
+}
+
+bool OpCodes::OpCode::isStop() const {
+    return opCode == OP_STOP ||
+           opCode == OP_RETURN ||
+           opCode == OP_INVALID ||
+           opCode == OP_SUICIDE;
 }

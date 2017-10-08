@@ -11,7 +11,8 @@ namespace OpCodes {
         std::string name;
         size_t stackRemoved, stackAdded, length;
 
-        OpCode(uint8_t opMode, const std::string &name, size_t stackRemoved, size_t stackAdded, size_t length);
+        OpCode(uint8_t opMode, const std::string &name, size_t stackRemoved = 0,
+               size_t stackAdded = 0, size_t length = 0);
 
         OpCode& operator=(const OpCode&) = delete;
         OpCode(const OpCode&) = delete;
@@ -20,10 +21,12 @@ namespace OpCodes {
         int dupNum() const;
         int swapNum() const;
         int pushNum() const;
+
+        bool isStop() const;
         bool isStackManipulatorOnly() const;
+        bool isArithmetic() const;
 
         int64_t Solve(const std::vector<int64_t>& input) const;
-        bool isArithmetic() const;
 
         bool operator==(const OpCode &rhs) const;
 
@@ -34,6 +37,8 @@ namespace OpCodes {
     extern const OpCode NAME;\
     static const uint8_t OP_ ## NAME = OPCODE;
 #include "opcodes_xx.h"
+
+    extern const OpCode UNKNOWN;
 
     const OpCode& get(uint8_t opCode);
 

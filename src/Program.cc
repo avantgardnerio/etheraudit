@@ -114,10 +114,20 @@ void CFInstruction::simplify() {
 }
 
 void CFInstruction::print() {
-    printOpCode(data.data(), offset, opCode);
+    //printOpCode(data.data(), offset, opCode);
     std::stringstream ss;
     if(operands.size() > 0 || outputs.size() > 0) {
-        ss << "\t\t " << opCode.name << "(";
+        if(outputs.size()) {
+            ss << "(";
+            for(size_t i = 0;i < outputs.size();i++) {
+                ss << outputs[i];
+                if(i != outputs.size() - 1) {
+                    ss << ", ";
+                }
+            }
+            ss << ") := ";
+        }
+        ss << opCode.name << "(";
 
         for (size_t i = 0; i < operands.size(); i++) {
             ss << operands[i];
@@ -125,19 +135,12 @@ void CFInstruction::print() {
                 ss << ", ";
         }
         ss << ")";
-        if(outputs.size()) {
-            ss << " = (";
-            for(size_t i = 0;i < outputs.size();i++) {
-                ss << outputs[i];
-                if(i != outputs.size() - 1) {
-                    ss << ", ";
-                }
-            }
-            ss << ")";
-        }
+
         ss << "\n";
-        printf("%s", ss.str().c_str());
+    } else {
+        ss << opCode.name << "\n";
     }
+    printf("\t%4lu (0x%04lx): %s", offset, offset, ss.str().c_str());
 }
 
 void Program::fillInstructions() {
