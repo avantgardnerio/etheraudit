@@ -17,7 +17,7 @@ break;\
 }
 #include "opcodes_xx.h"
         default: {
-            std::cerr << "Unknown opcode: 0x" << std::ios::hex << opCode << std::endl;
+            std::cerr << "Unknown opcode: 0x" << std::hex << (uint32_t)opCode << std::endl;
             assert(false);
         }
     }
@@ -64,8 +64,9 @@ int OpCodes::OpCode::pushNum() const {
 bool OpCodes::OpCode::isArithmetic() const {
     if(opCode == OP_EXP)
         return false; // It will overflow
-    
-    if(opCode >= OpCodes::OP_ADD && opCode < OpCodes::OP_SHA3)
+    if(opCode == OP_SIGNEXTEND)
+        return false;
+    if(opCode >= OpCodes::OP_ADD && opCode < OpCodes::OP_BYTE)
         return true;
 
     return false;
@@ -99,6 +100,9 @@ int64_t OpCodes::OpCode::Solve(const std::vector<int64_t> &input) const {
         case OP_NOT:
             assert(input.size() == 1);
             return ~input[0];
+        case OP_ISZERO:
+            assert(input.size() == 1);
+            return input[0] == 0;
         case OP_SUB:
             assert(input.size() == 2);
             return input[0] - input[1];
@@ -108,6 +112,18 @@ int64_t OpCodes::OpCode::Solve(const std::vector<int64_t> &input) const {
         case OP_ADD:
             assert(input.size() == 2);
             return input[0] + input[1];
+        case OP_GT:
+            assert(input.size() == 2);
+            return input[0] > input[1];
+        case OP_LT:
+            assert(input.size() == 2);
+            return input[0] > input[1];
+        case OP_XOR:
+            assert(input.size() == 2);
+            return input[0] ^ input[1];
+        case OP_MUL:
+            assert(input.size() == 2);
+            return input[0] * input[1];
         default:
             assert(false && "Please add the logic!");
     }

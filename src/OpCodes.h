@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <assert.h>
 
 namespace OpCodes {
     struct OpCode {
@@ -39,7 +40,7 @@ namespace OpCodes {
     template <typename F>
     void iterate(const std::vector<uint8_t>& bc, F f) {
         const uint8_t* data = bc.data();
-        while(data != bc.data() + bc.size()) {
+        while(data < bc.data() + bc.size()) {
             auto pos = data - bc.data();
             auto& opCode = get(*data);
             f(data + 1, pos, opCode);
