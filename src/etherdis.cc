@@ -60,7 +60,7 @@ int main(int argc, const char**argv) {
   //printByteCode(bc);
 
   Program p(bc);
-  p.print(all);
+    p.print(all, all);
   auto pt = p.Instructions().find(70)->second.get();
   return 0;
 }

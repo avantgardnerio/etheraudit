@@ -184,6 +184,14 @@ void CFInstruction::print() {
     printf("\t%4lu (0x%04lx): %s", offset, offset, ss.str().c_str());
 }
 
+bool CFInstruction::allOperandsConstant() const {
+    for(auto& op : operands) {
+        if(!op.isConstant)
+            return false;
+    }
+    return true;
+}
+
 void Program::fillInstructions() {
     std::vector<CFStackEntry> stack;
     size_t globalIdx = 0;
@@ -315,11 +323,11 @@ void Program::startGraph() {
 void Program::solveStack(size_t& globalIdx,
                          std::shared_ptr<CFNode> node,
                          std::shared_ptr<CFNode> pnode) {
-    std::map< CFStack, std::vector<executionPath> > possibleStackStarts;
+    std::map< CFStack, std::vector<executionPath> >& possibleStackStarts =
+            node->possibleEntryStackStates;
 
     if(pnode) {
-        std::cerr << node->idx << ", " << pnode->idx << std::endl;
-        for(auto& s : pnode->possibleStackStates) {
+        for(auto& s : pnode->possibleExitStackStates) {
             auto path = s.second;
             for(auto& p : path) {
                 p.push_back(pnode->idx);
@@ -377,8 +385,10 @@ void Program::solveStack(size_t& globalIdx,
                !instruction->operands.empty() &&
                instruction->operands.front().isConstant &&
                getInt64FromVec(instruction->operands.front().constantValue, &jumpLoc)) {
-                node->next.insert(nodes[jumpLoc]);
-                nodes[jumpLoc]->prev.insert(node);
+                if(nodes[jumpLoc]) {
+                    node->next.insert(nodes[jumpLoc]);
+                    nodes[jumpLoc]->prev.insert(node);
+                }
             }
 
             instruction->operands = oldOperands;
@@ -386,7 +396,7 @@ void Program::solveStack(size_t& globalIdx,
         }
 
         for(auto& p : _possibleStackStart.second)
-            node->possibleStackStates[stack].push_back(p);
+            node->possibleExitStackStates[stack].push_back(p);
     }
 }
 
@@ -417,18 +427,23 @@ void Program::solveStack() {
     }
 }
 
-Program::Program(std::vector<uint8_t> byteCode) : byteCode(byteCode) {
+Program::Program(const std::vector<uint8_t> &byteCode) : byteCode(byteCode) {
     fillInstructions();
     initGraph();
     startGraph();
     solveStack();
+
+    findCreatedContracts();
 }
 
-void Program::print(bool showStackOps) {
+void Program::print(bool showStackOps, bool showUnreachable) {
     printf("entry:\n");
     for(auto& pr : nodes) {
         auto& node = pr.second;
         if(!node)
+            continue;
+
+        if(!node->IsReachable() && !showUnreachable)
             continue;
         
         if(node->isJumpDest) {
@@ -455,6 +470,9 @@ void Program::print(bool showStackOps) {
             }
             printf("/*Reachable from %s*/\n", ss.str().c_str());
         }
+
+        printf("Entry states:\n");
+        printStackStates(node->possibleEntryStackStates);
         for(size_t i = node->start;i < node->end;i++) {
             //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
             if(instructions[i])
@@ -468,7 +486,21 @@ void Program::print(bool showStackOps) {
         }
         printf("\n");
 
-        for(auto& ps : node->possibleStackStates) {
+        printf("Exit states:\n");
+        printStackStates(node->possibleExitStackStates);
+        printf("\n");
+    }
+
+    if(!this->createdContracts.empty()) {
+        for(auto& cc : this->createdContracts) {
+            printf("Can Create contract:\n");
+            cc->print(showStackOps, showUnreachable);
+        }
+    }
+}
+
+void Program::printStackStates(const std::map< CFStack, std::vector<executionPath> >& stackStates) const {
+    for(auto& ps : stackStates) {
             auto& s = ps.first;
             auto& paths = ps.second;
             std::stringstream ss;
@@ -482,6 +514,47 @@ void Program::print(bool showStackOps) {
             for(int32_t i = s.size() - 1;i >= 0;i--) {
                 std::stringstream ss; ss << s[i];
                 printf("\t[%3lu]: %s\n", s.size() - i - 1, ss.str().c_str());
+            }
+        }
+}
+
+void Program::findCreatedContracts() {
+    for(auto& _instr : instructions) {
+        auto& instr = _instr.second;
+        if(!instr)
+            continue;
+
+        if(instr->opCode.opCode == OpCodes::OP_CODECOPY && instr->allOperandsConstant()) {
+            int64_t mLoc, mOffset, mSize;
+            bool canRead =
+                    getInt64FromVec(instr->operands[0].constantValue, &mLoc) &&
+                    getInt64FromVec(instr->operands[1].constantValue, &mOffset) &&
+                    getInt64FromVec(instr->operands[2].constantValue, &mSize);
+            assert(canRead);
+
+            auto pos = _instr.first;
+            while(pos < instructions.size()) {
+                auto instr = instructions[pos++];
+                if(instr && instr->opCode.isStop()) {
+
+                    if(instr->opCode.opCode == OpCodes::OP_RETURN && instr->allOperandsConstant()) {
+                        int64_t rLoc, rSize;
+                        bool canRead =
+                                getInt64FromVec(instr->operands[0].constantValue, &rLoc) &&
+                                getInt64FromVec(instr->operands[1].constantValue, &rSize);
+                        assert(canRead);
+
+                        std::vector<uint8_t> newBC;
+                        auto offset = rLoc - mLoc;
+                        for(int i = mOffset - offset;i < mOffset + rSize - offset;i++) {
+                            newBC.push_back(byteCode[i]);
+                        }
+
+                        createdContracts.emplace_back(std::make_shared<Program>(newBC));
+                    }
+
+                    break;
+                }
             }
         }
     }

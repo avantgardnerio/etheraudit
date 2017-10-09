@@ -43,7 +43,6 @@ struct CFNode {
 
     size_t idx = 0;
     bool isJumpDest = false;
-    bool isReachable = false;
     std::string label = "";
 
     bool IsReachable() const;
@@ -53,7 +52,8 @@ struct CFNode {
     bool hasUnknownOpCodes(const Program& p) const;
     std::shared_ptr<CFInstruction> lastInstruction(const Program& p) const;
 
-    std::map< CFStack, std::vector<executionPath> > possibleStackStates;
+    std::map< CFStack, std::vector<executionPath> > possibleEntryStackStates;
+    std::map< CFStack, std::vector<executionPath> > possibleExitStackStates;
 };
 
 struct CFInstruction {
@@ -65,6 +65,8 @@ struct CFInstruction {
 
     std::vector<CFStackEntry> operands;
     std::vector<CFStackEntry> outputs;
+
+    bool allOperandsConstant() const;
 
     void simplify();
 
@@ -85,9 +87,9 @@ public:
         return instructions;
     }
 
-    Program(std::vector<uint8_t> byteCode);
+    Program(const std::vector<uint8_t> &byteCode);
 
-    void print(bool showStackOps);
+    void print(bool showStackOps, bool showUnreachable);
 
     void startGraph();
 
@@ -96,4 +98,10 @@ public:
     void solveStack(size_t& globalIdx,
                     std::shared_ptr<CFNode> node,
                     std::shared_ptr<CFNode> pnode);
+
+    void printStackStates(const std::map< CFStack, std::vector<executionPath> >& stackStates) const;
+
+    std::vector<std::shared_ptr<Program>> createdContracts;
+
+    void findCreatedContracts();
 };
