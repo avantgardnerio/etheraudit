@@ -154,42 +154,50 @@ void CFInstruction::simplify() {
     }
 }
 
-void CFInstruction::print() {
-    //printOpCode(data.data(), offset, opCode);
-    std::stringstream ss;
-    if(operands.size() > 0 || outputs.size() > 0) {
-        if(outputs.size()) {
-            ss << "(";
-            for(size_t i = 0;i < outputs.size();i++) {
-                ss << outputs[i];
-                if(i != outputs.size() - 1) {
-                    ss << ", ";
-                }
-            }
-            ss << ") := ";
-        }
-        ss << opCode.name << "(";
-
-        for (size_t i = 0; i < operands.size(); i++) {
-            ss << operands[i];
-            if(i != operands.size() - 1)
-                ss << ", ";
-        }
-        ss << ")";
-
-        ss << "\n";
-    } else {
-        ss << opCode.name << "\n";
-    }
-    printf("\t%4lu (0x%04lx): %s", offset, offset, ss.str().c_str());
-}
-
 bool CFInstruction::allOperandsConstant() const {
     for(auto& op : operands) {
         if(!op.isConstant)
             return false;
     }
     return true;
+}
+
+std::ostream &operator<<(std::ostream &os, const CFInstruction &instruction) {
+    return instruction.Stream(os);
+}
+
+std::ostream &CFInstruction::Stream(std::ostream& os) const {
+    os << "\t";
+    os.width(4); os.fill(' '); os << std::dec << offset;
+    os << " (0x";
+    os.width(4); os.fill('0'); os << std::hex << offset;
+    os << "): ";
+
+    if(operands.size() > 0 || outputs.size() > 0) {
+        if(outputs.size()) {
+            os << "(";
+            for(size_t i = 0;i < outputs.size();i++) {
+                os << outputs[i];
+                if(i != outputs.size() - 1) {
+                    os << ", ";
+                }
+            }
+            os << ") := ";
+        }
+        os << opCode.name << "(";
+
+        for (size_t i = 0; i < operands.size(); i++) {
+            os << operands[i];
+            if(i != operands.size() - 1)
+                os << ", ";
+        }
+        os << ")";
+
+        os << "\n";
+    } else {
+        os << opCode.name << "\n";
+    }
+    return os;
 }
 
 void Program::fillInstructions() {
@@ -282,7 +290,10 @@ void Program::startGraph() {
     std::set< size_t > seen;
     std::vector< size_t > todo;
 
-    todo.push_back(0);
+    for(auto& n : nodes) {
+        todo.push_back(n.first);
+    }
+
     while(!todo.empty()) {
         auto pos = todo.back(); todo.pop_back();
 
@@ -297,10 +308,10 @@ void Program::startGraph() {
 
         if( lastInstr->opCode.isFallThrough()) {
             auto& next = nodes[ node->end];
-            assert(next);
-            node->next.insert(next);
-            next->prev.insert(node);
-            todo.push_back(node->end);
+            if(next) {
+                node->next.insert(next);
+                next->prev.insert(node);
+            }
         }
 
         if( lastInstr->opCode.opCode == OpCodes::OP_JUMPI ||
@@ -312,7 +323,6 @@ void Program::startGraph() {
                 if(auto& next = nodes[ nextAddr ]) {
                     node->next.insert(next);
                     next->prev.insert(node);
-                    todo.push_back(nextAddr);
                 }
             }
         }
@@ -437,126 +447,78 @@ Program::Program(const std::vector<uint8_t> &byteCode) : byteCode(byteCode) {
 }
 
 void Program::print(bool showStackOps, bool showUnreachable) {
-    printf("entry:\n");
-    for(auto& pr : nodes) {
-        auto& node = pr.second;
-        if(!node)
-            continue;
-
-        if(!node->IsReachable() && !showUnreachable)
-            continue;
-        
-        if(node->isJumpDest) {
-            printf("loc_%ld:\n", node->idx);
-        } else {
-            printf("/*%ld:/*\n", node->idx);
-        }
-        if(!node->IsReachable() && node->hasUnknownOpCodes(*this)) {
-            printf("/* Possible data section: */\n");
-            for(auto i = node->start;i < node->end;i++ ) {
-                if((i - node->start) % 16 == 0 && i != node->start)
-                    printf("\n");
-                printf("%02x ", byteCode[i]);
-            }
-            continue;
-        }
-
-        if(!node->IsReachable()) {
-            printf("/*Unreachable*/\n");
-        } else {
-            std::stringstream ss;
-            for(auto& n : node->prev) {
-                ss << n->idx << " ";
-            }
-            printf("/*Reachable from %s*/\n", ss.str().c_str());
-        }
-
-        printf("Entry states:\n");
-        printStackStates(node->possibleEntryStackStates);
-        for(size_t i = node->start;i < node->end;i++) {
-            //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
-            if(instructions[i])
-                if(showStackOps || !instructions[i]->opCode.isStackManipulatorOnly())
-                    instructions[i]->print();
-        }
-
-        printf("Can go to: ");
-        for(auto& n : node->next) {
-            printf("%lu, ", n->idx);
-        }
-        printf("\n");
-
-        printf("Exit states:\n");
-        printStackStates(node->possibleExitStackStates);
-        printf("\n");
-    }
-
-    if(!this->createdContracts.empty()) {
-        for(auto& cc : this->createdContracts) {
-            printf("Can Create contract:\n");
-            cc->print(showStackOps, showUnreachable);
-        }
-    }
+    std::cout << DisassemReport(*this, showStackOps, showUnreachable);
 }
 
-void Program::printStackStates(const std::map< CFStack, std::vector<executionPath> >& stackStates) const {
+std::ostream& Program::streamStackStates(std::ostream& os, const std::map<CFStack, std::vector<executionPath> > &stackStates) const {
     for(auto& ps : stackStates) {
             auto& s = ps.first;
             auto& paths = ps.second;
-            std::stringstream ss;
+
+        os << "For execution paths: ";
             for(auto& path : paths) {
                 for(auto& node : path) {
-                    ss << node << "-";
+                    os << node << "-";
                 }
-                ss << ", ";
+                os << ", ";
             }
-            printf("For execution paths: %s\n", ss.str().c_str());
+        os << std::endl;
             for(int32_t i = s.size() - 1;i >= 0;i--) {
-                std::stringstream ss; ss << s[i];
-                printf("\t[%3lu]: %s\n", s.size() - i - 1, ss.str().c_str());
+                os << "\t[";
+                os.width(3); os.fill(' ');
+                os << (s.size() - i - 1) << "]: ";
+                os << s[i] << std::endl;
             }
         }
 }
 
 void Program::findCreatedContracts() {
-    for(auto& _instr : instructions) {
-        auto& instr = _instr.second;
-        if(!instr)
+    for(auto& _node : nodes) {
+        auto& node = _node.second;
+        if(!node) continue;
+
+        auto nodeInstructions = node->Instructions(*this);
+        if(!node->IsReachable())
             continue;
+        for (auto &instr : nodeInstructions) {
+            if (!instr)
+                continue;
 
-        if(instr->opCode.opCode == OpCodes::OP_CODECOPY && instr->allOperandsConstant()) {
-            int64_t mLoc, mOffset, mSize;
-            bool canRead =
-                    getInt64FromVec(instr->operands[0].constantValue, &mLoc) &&
-                    getInt64FromVec(instr->operands[1].constantValue, &mOffset) &&
-                    getInt64FromVec(instr->operands[2].constantValue, &mSize);
-            assert(canRead);
+            if (instr->opCode.opCode == OpCodes::OP_CODECOPY && instr->allOperandsConstant()) {
+                int64_t mLoc, mOffset, mSize;
+                bool canRead =
+                        getInt64FromVec(instr->operands[0].constantValue, &mLoc) &&
+                        getInt64FromVec(instr->operands[1].constantValue, &mOffset) &&
+                        getInt64FromVec(instr->operands[2].constantValue, &mSize);
+                assert(canRead);
 
-            auto pos = _instr.first;
-            while(pos < instructions.size()) {
-                auto instr = instructions[pos++];
-                if(instr && instr->opCode.isStop()) {
+                auto pos = instr->offset;
+                while (pos < instructions.size()) {
+                    auto instr = instructions[pos++];
+                    if (instr && instr->opCode.isStop()) {
 
-                    if(instr->opCode.opCode == OpCodes::OP_RETURN && instr->allOperandsConstant()) {
-                        int64_t rLoc, rSize;
-                        bool canRead =
-                                getInt64FromVec(instr->operands[0].constantValue, &rLoc) &&
-                                getInt64FromVec(instr->operands[1].constantValue, &rSize);
-                        assert(canRead);
+                        if (instr->opCode.opCode == OpCodes::OP_RETURN && instr->allOperandsConstant()) {
+                            int64_t rLoc, rSize;
+                            bool canRead =
+                                    getInt64FromVec(instr->operands[0].constantValue, &rLoc) &&
+                                    getInt64FromVec(instr->operands[1].constantValue, &rSize);
+                            assert(canRead);
 
-                        std::vector<uint8_t> newBC;
-                        auto offset = rLoc - mLoc;
-                        for(int i = mOffset - offset;i < mOffset + rSize - offset;i++) {
-                            newBC.push_back(byteCode[i]);
+                            std::vector<uint8_t> newBC;
+                            auto offset = rLoc - mLoc;
+                            for (int i = mOffset - offset; i < mOffset + rSize - offset; i++) {
+                                newBC.push_back(byteCode[i]);
+                            }
+
+                            createdContracts.emplace_back(std::make_shared<Program>(newBC));
                         }
 
-                        createdContracts.emplace_back(std::make_shared<Program>(newBC));
+                        break;
                     }
-
-                    break;
                 }
             }
         }
+
     }
 }
 
@@ -592,4 +554,82 @@ bool CFNode::hasUnknownOpCodes(const Program &p) const {
 
 bool CFNode::IsReachable() const {
     return idx == 0 || !prev.empty();
+}
+
+std::ostream &operator<<(std::ostream &os, const ProgramReport &report) {
+    return report.Stream(os);
+}
+
+ProgramReport::ProgramReport(const Program &program) : program(program) {}
+
+DisassemReport::DisassemReport(const Program &program, bool shouldPrintStackOps, bool shouldShowUnreachable)
+        : ProgramReport(program), shouldPrintStackOps(shouldPrintStackOps),
+          shouldShowUnreachable(shouldShowUnreachable) {}
+
+std::ostream &DisassemReport::Stream(std::ostream &os) const {
+    os << "entry:" << std::endl;
+    for(auto& pr : program.Nodes()) {
+        auto& node = pr.second;
+        if(!node)
+            continue;
+
+        if(!node->IsReachable() && !shouldShowUnreachable)
+            continue;
+
+        if(node->isJumpDest) {
+            os << "loc_" << node->idx << ": " << std::endl;
+        } else {
+            os << "/* Block " << std::dec << node->idx << "*/" << std::endl;
+        }
+        if(!node->IsReachable() && node->hasUnknownOpCodes(program)) {
+            os << "/* Possible data section: */" << std::endl;
+            for(auto i = node->start;i < node->end;i++ ) {
+                if((i - node->start) % 16 == 0 && i != node->start)
+                    os << std::endl;
+                os.fill('0');
+                os.width(2);
+                os << std::hex << (uint32_t)program.ByteCode()[i] << " ";
+            }
+            os << std::endl;
+            continue;
+        }
+
+        if(!node->IsReachable()) {
+            os << "/* Unreachable*/" << std::endl;
+        } else {
+            os << "/* Reachable from ";
+            for(auto& n : node->prev) {
+                os << n->idx << " ";
+            }
+            os << "*/" << std::endl;
+        }
+
+        os << "Entry states:" << std::endl;
+        program.streamStackStates(os, node->possibleEntryStackStates);
+        for(size_t i = node->start;i < node->end;i++) {
+            //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
+            if(auto instr = program.GetInstructionByOffset(i))
+                if(shouldPrintStackOps || !instr->opCode.isStackManipulatorOnly())
+                    os << *instr;
+        }
+
+        os << "Can go to: ";
+        for(auto& n : node->next) {
+            os << n->idx << ", ";
+        }
+        os << std::endl;
+
+        os << "Exit states:" << std::endl;
+        program.streamStackStates(os, node->possibleExitStackStates);
+        os << std::endl;
+    }
+
+    if(!program.createdContracts.empty()) {
+        for(auto& cc : program.createdContracts) {
+            os << "Can Create contract:" << std::endl;
+            cc->print(shouldPrintStackOps, shouldShowUnreachable);
+        }
+    }
+
+    return os;
 }
