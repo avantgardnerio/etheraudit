@@ -35,5 +35,42 @@ bool CFNode::hasUnknownOpCodes(const Program &p) const {
 }
 
 bool CFNode::IsReachable() const {
-    return idx == 0 || !prev.empty();
+    if(isReachable || idx == 0)
+        return true;
+
+    if(isReachableStale) {
+        isReachableStale = false;
+
+        if(prev.empty()) {
+            return false;
+        }
+        for(auto& p : prev) {
+            if(p->IsReachable()) {
+                return isReachable = true;
+            }
+        }
+    }
+    return false;
+}
+
+void CFNode::AddNext(const std::shared_ptr<CFNode> &next) {
+    this->next.insert(next);
+    next->prev.insert(this->shared_from_this());
+    next->isReachableStale = true;
+}
+
+bool CFNode::HasPossibleEntryStackStates() const {
+    for(auto& m : possibleEntryStackStates) {
+        if(!m.first.empty())
+            return true;
+    }
+    return false;
+}
+
+bool CFNode::HasPossibleExitStackStates() const {
+    for(auto& m : possibleExitStackStates) {
+        if(!m.first.empty())
+            return true;
+    }
+    return false;
 }

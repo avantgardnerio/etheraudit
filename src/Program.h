@@ -76,3 +76,10 @@ public:
 
     std::ostream &Stream(std::ostream &os) const override;
 };
+
+class PsuedoStackReport : public ProgramReport {
+public:
+    PsuedoStackReport(const Program &program);
+
+    std::ostream &Stream(std::ostream &os) const override;
+};

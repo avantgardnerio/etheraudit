@@ -12,21 +12,28 @@
 class CFInstruction;
 class Program;
 
-struct CFNode {
+class CFNode : public std::enable_shared_from_this<CFNode> {
+    mutable bool isReachable = false, isReachableStale = true;
+    std::set<std::shared_ptr<CFNode>> next, prev;
+public:
     size_t start = 0,
             end = 0;
 
     size_t idx = 0;
     bool isJumpDest = false;
-    std::__cxx11::string label = "";
+    std::string label = "";
 
     bool IsReachable() const;
-    std::set<std::shared_ptr<CFNode>> next, prev;
-
+    const std::set<std::shared_ptr<CFNode>>& NextNodes() const { return next; }
+    const std::set<std::shared_ptr<CFNode>>& PrevNodes() const { return prev; }
+    void AddNext(const std::shared_ptr<CFNode>& next);
     std::vector<std::shared_ptr<CFInstruction>> Instructions(const Program& p) const;
     bool hasUnknownOpCodes(const Program& p) const;
     std::shared_ptr<CFInstruction> lastInstruction(const Program& p) const;
 
+    bool HasPossibleEntryStackStates() const;
     std::map<std::vector<CFStackEntry>, std::vector<std::vector<size_t>> > possibleEntryStackStates;
+
+    bool HasPossibleExitStackStates() const;
     std::map<std::vector<CFStackEntry>, std::vector<std::vector<size_t>> > possibleExitStackStates;
 };

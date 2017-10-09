@@ -127,8 +127,7 @@ void Program::startGraph() {
         if( lastInstr->opCode.isFallThrough()) {
             auto& next = nodes[ node->end];
             if(next) {
-                node->next.insert(next);
-                next->prev.insert(node);
+                node->AddNext(next);
             }
         }
 
@@ -139,8 +138,7 @@ void Program::startGraph() {
             int64_t nextAddr = 0;
             if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
                 if(auto& next = nodes[ nextAddr ]) {
-                    node->next.insert(next);
-                    next->prev.insert(node);
+                    node->AddNext(next);
                 }
             }
         }
@@ -214,8 +212,7 @@ void Program::solveStack(size_t& globalIdx,
                instruction->operands.front().isConstant &&
                getInt64FromVec(instruction->operands.front().constantValue, &jumpLoc)) {
                 if(nodes[jumpLoc]) {
-                    node->next.insert(nodes[jumpLoc]);
-                    nodes[jumpLoc]->prev.insert(node);
+                    node->AddNext(nodes[jumpLoc]);
                 }
             }
 
@@ -249,7 +246,7 @@ void Program::solveStack() {
 
         solveStack(globalIdx, node, pos.second);
 
-        for(auto& n : node->next) {
+        for(auto& n : node->NextNodes()) {
                 todo.emplace_back(n, node);
         }
     }
@@ -266,6 +263,13 @@ Program::Program(const std::vector<uint8_t> &byteCode) : byteCode(byteCode) {
 
 void Program::print(bool showStackOps, bool showUnreachable) {
     std::cout << DisassemReport(*this, showStackOps, showUnreachable);
+
+    if(!createdContracts.empty()) {
+        for(auto& cc : createdContracts) {
+            std::cout << std::endl << "Can Create contract:" << std::endl;
+            cc->print(showStackOps, showUnreachable);
+        }
+    }
 }
 
 std::ostream& Program::streamStackStates(std::ostream& os, const std::map<CFStack, std::vector<executionPath> > &stackStates) const {
@@ -275,10 +279,15 @@ std::ostream& Program::streamStackStates(std::ostream& os, const std::map<CFStac
 
         os << "For execution paths: ";
             for(auto& path : paths) {
+                bool isFirst = true;
                 for(auto& node : path) {
-                    os << node << "-";
+                    if(!isFirst) {
+                        os << "->";
+                    }
+                    isFirst = false;
+                    os << node;
                 }
-                os << ", ";
+                os << " ";
             }
         os << std::endl;
             for(int32_t i = s.size() - 1;i >= 0;i--) {
@@ -288,6 +297,7 @@ std::ostream& Program::streamStackStates(std::ostream& os, const std::map<CFStac
                 os << s[i] << std::endl;
             }
         }
+    os << std::endl;
 }
 
 void Program::findCreatedContracts() {
@@ -361,7 +371,7 @@ std::ostream &DisassemReport::Stream(std::ostream &os) const {
             continue;
 
         if(node->isJumpDest) {
-            os << "loc_" << node->idx << ": " << std::endl;
+            os << "loc_" << std::dec << node->idx << ": " << std::endl;
         } else {
             os << "/* Block " << std::dec << node->idx << "*/" << std::endl;
         }
@@ -380,16 +390,22 @@ std::ostream &DisassemReport::Stream(std::ostream &os) const {
 
         if(!node->IsReachable()) {
             os << "/* Unreachable*/" << std::endl;
-        } else {
+        } else if(!node->PrevNodes().empty()){
             os << "/* Reachable from ";
-            for(auto& n : node->prev) {
+            for(auto& n : node->PrevNodes()) {
+                os << std::dec << n->idx << " ";
+            }
+            os << "*/" << std::endl;
+        }
+
+        if(!node->NextNodes().empty()) {
+            os << "/* Exits to: ";
+            for (auto &n : node->NextNodes()) {
                 os << n->idx << " ";
             }
             os << "*/" << std::endl;
         }
 
-        os << "Entry states:" << std::endl;
-        program.streamStackStates(os, node->possibleEntryStackStates);
         for(size_t i = node->start;i < node->end;i++) {
             //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
             if(auto instr = program.GetInstructionByOffset(i))
@@ -397,22 +413,32 @@ std::ostream &DisassemReport::Stream(std::ostream &os) const {
                     os << *instr;
         }
 
-        os << "Can go to: ";
-        for(auto& n : node->next) {
-            os << n->idx << ", ";
-        }
-        os << std::endl;
-
-        os << "Exit states:" << std::endl;
-        program.streamStackStates(os, node->possibleExitStackStates);
-        os << std::endl;
     }
 
-    if(!program.createdContracts.empty()) {
-        for(auto& cc : program.createdContracts) {
-            os << "Can Create contract:" << std::endl;
-            cc->print(shouldPrintStackOps, shouldShowUnreachable);
+    return os;
+}
+
+PsuedoStackReport::PsuedoStackReport(const Program &program) : ProgramReport(program) {}
+
+std::ostream &PsuedoStackReport::Stream(std::ostream &os) const {
+    for(auto& pr : program.Nodes()) {
+        auto &node = pr.second;
+        if (!node)
+            continue;
+
+        os << "=====================================================" << std::endl;
+        os << "Node: " << node->idx << std::endl << std::endl;
+
+        if(node->HasPossibleEntryStackStates()) {
+            os << "Entry states:" << std::endl;
+            program.streamStackStates(os, node->possibleEntryStackStates);
         }
+
+        if(node->HasPossibleExitStackStates()) {
+            os << "Exit states:" << std::endl;
+            program.streamStackStates(os, node->possibleExitStackStates);
+        }
+
     }
 
     return os;

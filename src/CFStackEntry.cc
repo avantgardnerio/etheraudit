@@ -23,7 +23,7 @@ std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry) {
         } else {
             os << "<#";
         }
-        os << entry.idx << ">";
+        os << std::dec << entry.idx << ">";
     }
     return os;
 }
