@@ -226,8 +226,9 @@ void Program::fillInstructions() {
         }
 
         instructions[pos]->simplify();
-        for(auto& o : instructions[pos]->outputs) {
-            stack.push_back(o);
+        for (auto it = instructions[pos]->outputs.rbegin();
+             it != instructions[pos]->outputs.rend();it++) {
+            stack.push_back(*it);
         }
 
     });
@@ -356,8 +357,9 @@ void Program::solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node) {
             }
 
             instructions[pos]->simplify();
-            for (auto &o : instructions[pos]->outputs) {
-                stack.push_back(o);
+            for (auto it = instructions[pos]->outputs.rbegin();
+                    it != instructions[pos]->outputs.rend();it++) {
+                stack.push_back(*it);
             }
         }
 
