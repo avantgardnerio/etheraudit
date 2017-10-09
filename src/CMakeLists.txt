@@ -4,4 +4,8 @@ project(etheraudit)
 
 add_executable(etherdis etherdis.cc opcodes_xx.h
         OpCodes.cc OpCodes.h
-        Program.cc Program.h)
+        Program.cc Program.h
+        CFStackEntry.cc CFStackEntry.h
+        CFNode.cc CFNode.h
+        CFInstruction.cc CFInstruction.h
+        Utils.cc Utils.h)
