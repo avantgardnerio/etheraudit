@@ -36,14 +36,31 @@ std::string readFile(std::ifstream& fs) {
   return rtn; 
 }
 
-int main(int argc, const char**argv) {
-  std::ifstream f(argv[1]);
+#define COMMAND_LINE_FLAGS \
+XX(all)
 
-  auto bc = parseByteCodeString(readFile(f));
+#define XX(name) bool name = false;
+COMMAND_LINE_FLAGS
+#undef XX
+
+int main(int argc, const char**argv) {
+  size_t farg = 1;
+  for(size_t i = 1;i < argc;i++) {
+      std::string arg = argv[i];
+#define XX(name) if(arg == "--"#name) name = true;
+      COMMAND_LINE_FLAGS
+#undef XX
+
+      if(arg[0] != '-')
+          farg = i;
+  }
+
+    std::ifstream f(argv[farg]);
+    auto bc = parseByteCodeString(readFile(f));
   //printByteCode(bc);
 
   Program p(bc);
-  p.print();
+  p.print(all);
   auto pt = p.Instructions().find(70)->second.get();
   return 0;
 }

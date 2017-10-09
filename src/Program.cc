@@ -3,6 +3,7 @@
 //
 
 #include <set>
+#include <iostream>
 #include "Program.h"
 
 static void printOpCode(const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode) {
@@ -237,7 +238,6 @@ void Program::fillInstructions() {
 void Program::initGraph() {
     size_t idx = 1;
     CFNode currNode;
-    currNode.isReachable = true;
 
     for(auto& inst : instructions) {
         auto& instruction = *inst.second;
@@ -286,13 +286,12 @@ void Program::startGraph() {
         assert(node);
         auto lastInstr = node->lastInstruction(*this);
         assert(lastInstr);
-        node->isReachable = true;
 
         if( lastInstr->opCode.isFallThrough()) {
             auto& next = nodes[ node->end];
             assert(next);
-            node->next.push_back(next);
-            next->prev.push_back(node);
+            node->next.insert(next);
+            next->prev.insert(node);
             todo.push_back(node->end);
         }
 
@@ -303,8 +302,8 @@ void Program::startGraph() {
             int64_t nextAddr = 0;
             if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
                 if(auto& next = nodes[ nextAddr ]) {
-                    node->next.push_back(next);
-                    next->prev.push_back(node);
+                    node->next.insert(next);
+                    next->prev.insert(node);
                     todo.push_back(nextAddr);
                 }
             }
@@ -313,34 +312,45 @@ void Program::startGraph() {
     }
 }
 
-void Program::solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node) {
+void Program::solveStack(size_t& globalIdx,
+                         std::shared_ptr<CFNode> node,
+                         std::shared_ptr<CFNode> pnode) {
     std::map< CFStack, std::vector<executionPath> > possibleStackStarts;
 
-    for(auto& p : node->prev) {
-        for(auto& s : node->possibleStackStates) {
+    if(pnode) {
+        std::cerr << node->idx << ", " << pnode->idx << std::endl;
+        for(auto& s : pnode->possibleStackStates) {
             auto path = s.second;
             for(auto& p : path) {
-                p.push_back(node->idx);
+                p.push_back(pnode->idx);
                 possibleStackStarts[s.first].push_back(p);
             }
         }
     }
+    else {
+        assert(node->idx == 0);
+        CFStack empty;
+        possibleStackStarts[empty].emplace_back();
+    }
 
-    auto instructions = node->Instructions(*this);
+    auto nodeInstructions = node->Instructions(*this);
 
     for(auto& _possibleStackStart : possibleStackStarts) {
         auto stack = _possibleStackStart.first;
 
-        for(auto& instruction : instructions) {
+        for(auto& instruction : nodeInstructions) {
             auto& opCode = instruction->opCode;
             auto pos = instruction->offset;
 
-            instructions[pos]->operands.clear();
-            instructions[pos]->outputs.clear();
+            auto oldOperands = instruction->operands;
+            auto oldOutputs = instruction->outputs;
+
+            instruction->operands.clear();
+            instruction->outputs.clear();
 
             auto stackBack = stack.end();
             for (size_t i = 0; i < opCode.stackRemoved; i++) {
-                instructions[pos]->operands.emplace_back(stack.back());
+                instruction->operands.emplace_back(stack.back());
                 stack.pop_back();
             }
 
@@ -350,29 +360,44 @@ void Program::solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node) {
                 if (opCode.opCode >= OpCodes::PUSH1.opCode &&
                     opCode.opCode <= OpCodes::PUSH32.opCode) {
                     entry.isConstant = true;
-                    assert(instructions[pos]->data.size());
-                    entry.constantValue = instructions[pos]->data;
+                    assert(instruction->data.size());
+                    entry.constantValue = instruction->data;
                 }
-                instructions[pos]->outputs.emplace_back(entry);
+                instruction->outputs.emplace_back(entry);
             }
 
-            instructions[pos]->simplify();
-            for (auto it = instructions[pos]->outputs.rbegin();
-                    it != instructions[pos]->outputs.rend();it++) {
+            instruction->simplify();
+            for (auto it = instruction->outputs.rbegin();
+                    it != instruction->outputs.rend();it++) {
                 stack.push_back(*it);
             }
+
+            int64_t jumpLoc = 0;
+            if(instruction->opCode.isBranch() &&
+               !instruction->operands.empty() &&
+               instruction->operands.front().isConstant &&
+               getInt64FromVec(instruction->operands.front().constantValue, &jumpLoc)) {
+                node->next.insert(nodes[jumpLoc]);
+                nodes[jumpLoc]->prev.insert(node);
+            }
+
+            instruction->operands = oldOperands;
+            instruction->outputs = oldOutputs;
         }
 
-        //possibleStackStarts[stack].push_back(_possibleStackStart.second);
+        for(auto& p : _possibleStackStart.second)
+            node->possibleStackStates[stack].push_back(p);
     }
 }
 
 void Program::solveStack() {
-    std::set< size_t > seen;
-    std::vector< size_t > todo;
+    typedef std::pair< std::shared_ptr<CFNode>,
+            std::shared_ptr<CFNode> > NodePair;
+    std::set< NodePair > seen;
+    std::vector< NodePair > todo;
     size_t globalIdx = 0;
 
-    todo.push_back(0);
+    todo.emplace_back(nodes[0], nullptr);
     while(!todo.empty()) {
         auto pos = todo.back();
         todo.pop_back();
@@ -381,13 +406,13 @@ void Program::solveStack() {
             continue;
         seen.insert(pos);
 
-        auto node = nodes[pos];
+        auto node = pos.first;
         assert(node);
 
-        solveStack(globalIdx, node);
+        solveStack(globalIdx, node, pos.second);
 
         for(auto& n : node->next) {
-            todo.push_back(n->idx);
+                todo.emplace_back(n, node);
         }
     }
 }
@@ -396,10 +421,10 @@ Program::Program(std::vector<uint8_t> byteCode) : byteCode(byteCode) {
     fillInstructions();
     initGraph();
     startGraph();
-    //solveStack();
+    solveStack();
 }
 
-void Program::print() {
+void Program::print(bool showStackOps) {
     printf("entry:\n");
     for(auto& pr : nodes) {
         auto& node = pr.second;
@@ -411,7 +436,7 @@ void Program::print() {
         } else {
             printf("/*%ld:/*\n", node->idx);
         }
-        if(!node->isReachable && node->hasUnknownOpCodes(*this)) {
+        if(!node->IsReachable() && node->hasUnknownOpCodes(*this)) {
             printf("/* Possible data section: */\n");
             for(auto i = node->start;i < node->end;i++ ) {
                 if((i - node->start) % 16 == 0 && i != node->start)
@@ -421,7 +446,7 @@ void Program::print() {
             continue;
         }
 
-        if(!node->isReachable) {
+        if(!node->IsReachable()) {
             printf("/*Unreachable*/\n");
         } else {
             std::stringstream ss;
@@ -431,9 +456,33 @@ void Program::print() {
             printf("/*Reachable from %s*/\n", ss.str().c_str());
         }
         for(size_t i = node->start;i < node->end;i++) {
-            if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
-                //if(instructions[i])
-                instructions[i]->print();
+            //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
+            if(instructions[i])
+                if(showStackOps || !instructions[i]->opCode.isStackManipulatorOnly())
+                    instructions[i]->print();
+        }
+
+        printf("Can go to: ");
+        for(auto& n : node->next) {
+            printf("%lu, ", n->idx);
+        }
+        printf("\n");
+
+        for(auto& ps : node->possibleStackStates) {
+            auto& s = ps.first;
+            auto& paths = ps.second;
+            std::stringstream ss;
+            for(auto& path : paths) {
+                for(auto& node : path) {
+                    ss << node << "-";
+                }
+                ss << ", ";
+            }
+            printf("For execution paths: %s\n", ss.str().c_str());
+            for(int32_t i = s.size() - 1;i >= 0;i--) {
+                std::stringstream ss; ss << s[i];
+                printf("\t[%3lu]: %s\n", s.size() - i - 1, ss.str().c_str());
+            }
         }
     }
 }
@@ -466,4 +515,8 @@ bool CFNode::hasUnknownOpCodes(const Program &p) const {
             return true;
     }
     return false;
+}
+
+bool CFNode::IsReachable() const {
+    return idx == 0 || !prev.empty();
 }

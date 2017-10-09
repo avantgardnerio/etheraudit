@@ -5,6 +5,8 @@
 #include <sstream>
 #include <algorithm>
 #include <map>
+#include <set>
+
 #include "OpCodes.h"
 
 struct CFInstruction;
@@ -44,7 +46,8 @@ struct CFNode {
     bool isReachable = false;
     std::string label = "";
 
-    std::vector<std::shared_ptr<CFNode>> next, prev;
+    bool IsReachable() const;
+    std::set<std::shared_ptr<CFNode>> next, prev;
 
     std::vector<std::shared_ptr<CFInstruction>> Instructions(const Program& p) const;
     bool hasUnknownOpCodes(const Program& p) const;
@@ -84,11 +87,13 @@ public:
 
     Program(std::vector<uint8_t> byteCode);
 
-    void print();
+    void print(bool showStackOps);
 
     void startGraph();
 
     void solveStack();
 
-    void solveStack(size_t& globalIdx, std::shared_ptr<CFNode> node);
+    void solveStack(size_t& globalIdx,
+                    std::shared_ptr<CFNode> node,
+                    std::shared_ptr<CFNode> pnode);
 };
