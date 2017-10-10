@@ -94,6 +94,8 @@ int main(int argc, const char **argv) {
     for(size_t farg = farg_start; farg < argc;farg++) {
         std::string fileName = argv[farg];
         std::ifstream f(fileName);
+        assert(f);
+
         std::cout << "Processing file '" << fileName << "'" << std::endl;
         auto bc = parseByteCodeString(readFile(f));
 

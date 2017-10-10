@@ -50,7 +50,9 @@ namespace OpCodes {
         while(data < bc.data() + bc.size()) {
             auto pos = data - bc.data();
             auto& opCode = get(*data);
-            f(data + 1, pos, opCode);
+            if(data + opCode.length < bc.data() + bc.size()) {
+                f(data + 1, pos, opCode);
+            }
             data += opCode.length + 1;
         }
     }
