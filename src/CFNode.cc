@@ -18,7 +18,7 @@ std::vector<std::shared_ptr<CFInstruction>> CFNode::Instructions(const Program &
     std::vector<std::shared_ptr<CFInstruction>> rtn;
     for(size_t i = start; i < end; i++) {
         auto it = p.Instructions().find(i);
-        if(it != p.Instructions().end()) {
+        if(it != p.Instructions().end() && it->second) {
             rtn.push_back(it->second);
         }
     }

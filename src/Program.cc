@@ -138,7 +138,12 @@ void Program::startGraph() {
             int64_t nextAddr = 0;
             if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
                 if(auto& next = nodes[ nextAddr ]) {
-                    node->AddNext(next);
+                    //assert(next->isJumpDest);
+                    if(next->isJumpDest)
+                        node->AddNext(next);
+                    else
+                        std::cerr << "Disallowing jump from " << node->idx << "  to " << next->idx << std::endl;
+
                 }
             }
         }
@@ -168,7 +173,10 @@ void Program::solveStack(size_t& globalIdx,
     }
 
     auto nodeInstructions = node->Instructions(*this);
-
+    size_t argumentIdx = 0;
+    if(possibleStackStarts.size() > 50) {
+        //streamStackStates(std::cerr, possibleStackStarts);
+    }
     for(auto& _possibleStackStart : possibleStackStarts) {
         auto stack = _possibleStackStart.first;
 
@@ -184,6 +192,13 @@ void Program::solveStack(size_t& globalIdx,
 
             auto stackBack = stack.end();
             for (size_t i = 0; i < opCode.stackRemoved; i++) {
+                if(stack.size() == 0) {
+                    CFStackEntry entry;
+                    entry.label = "argument";
+                    entry.idx = argumentIdx++;
+                    stack.push_back(entry);
+                }
+
                 instruction->operands.emplace_back(stack.back());
                 stack.pop_back();
             }
@@ -211,14 +226,20 @@ void Program::solveStack(size_t& globalIdx,
                !instruction->operands.empty() &&
                instruction->operands.front().isConstant &&
                getInt64FromVec(instruction->operands.front().constantValue, &jumpLoc)) {
-                if(nodes[jumpLoc]) {
-                    node->AddNext(nodes[jumpLoc]);
+                if(auto jumpNode = nodes[jumpLoc]) {
+                    //assert(jumpNode->isJumpDest);
+                    if(jumpNode->isJumpDest)
+                        node->AddNext(jumpNode);
+                    else
+                        std::cerr << "Disallowing jump from " << node->idx << "  to " << jumpNode->idx << std::endl;
+
                 }
             }
 
             instruction->operands = oldOperands;
             instruction->outputs = oldOutputs;
         }
+
 
         for(auto& p : _possibleStackStart.second)
             node->possibleExitStackStates[stack].push_back(p);

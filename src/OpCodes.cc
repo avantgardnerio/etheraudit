@@ -139,6 +139,9 @@ int64_t OpCodes::OpCode::Solve(const std::vector<int64_t> &input) const {
         case OP_MUL:
             assert(input.size() == 2);
             return input[0] * input[1];
+        case OP_MOD:
+            assert(input.size() == 2);
+            return input[0] % input[1];
         default:
             assert(false && "Please add the logic!");
     }

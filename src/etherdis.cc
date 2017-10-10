@@ -80,37 +80,40 @@ void createOutDir(const Program &program);
 #undef XX
 
 int main(int argc, const char **argv) {
-    size_t farg = 1;
+    int farg_start = -1;
     for (size_t i = 1; i < argc; i++) {
         std::string arg = argv[i];
 #define XX(name) if(arg == "--"#name) name = true;
         COMMAND_LINE_FLAGS
 #undef XX
 
-        if (arg[0] != '-')
-            farg = i;
+        if (arg[0] != '-' && farg_start == -1)
+            farg_start = i;
     }
 
-    std::string fileName = argv[farg];
-    std::ifstream f(fileName);
-    auto bc = parseByteCodeString(readFile(f));
+    for(size_t farg = farg_start; farg < argc;farg++) {
+        std::string fileName = argv[farg];
+        std::ifstream f(fileName);
+        std::cout << "Processing file '" << fileName << "'" << std::endl;
+        auto bc = parseByteCodeString(readFile(f));
 
-    Program p(bc);
+        Program p(bc);
 
-    if(outdir) {
-        auto dirName = fileName;
-        auto pos = dirName.find_last_of('.');
-        if(pos == std::string::npos) {
-            dirName = "_" + dirName;
-        } else {
-            while(dirName.size() >= pos) {
-                dirName.pop_back();
+        if (outdir) {
+            auto dirName = fileName;
+            auto pos = dirName.find_last_of('.');
+            if (pos == std::string::npos) {
+                dirName = "_" + dirName;
+            } else {
+                while (dirName.size() > pos) {
+                    dirName.pop_back();
+                }
             }
-        }
 
-        createOutDir(dirName, p);
-    } else {
-        p.print(all, all);
+            createOutDir(dirName, p);
+        } else {
+            p.print(all, all);
+        }
     }
 
     return 0;
