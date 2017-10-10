@@ -40,7 +40,8 @@ void Program::fillInstructions() {
             if(stack.size() == 0) {
                 CFStackEntry entry;
                 entry.label = "argument";
-                entry.idx = (*jumpIdx)++;
+                if(jumpIdx)
+                    entry.idx = (*jumpIdx)++;
                 stack.push_back(entry);
             }
 
@@ -99,7 +100,7 @@ void Program::initGraph() {
         }
     }
 
-    if(currNode.start != -1) {
+    if(currNode.start != -1 && currNode.end != currNode.start) {
         nodes[currNode.start] = std::make_shared<CFNode>(currNode);
     }
 }
@@ -253,6 +254,7 @@ void Program::solveStack() {
     std::vector< NodePair > todo;
     size_t globalIdx = 0;
 
+    assert(nodes[0]);
     todo.emplace_back(nodes[0], nullptr);
     while(!todo.empty()) {
         auto pos = todo.back();
@@ -268,6 +270,7 @@ void Program::solveStack() {
         solveStack(globalIdx, node, pos.second);
 
         for(auto& n : node->NextNodes()) {
+            assert(n);
                 todo.emplace_back(n, node);
         }
     }
@@ -319,6 +322,7 @@ std::ostream& Program::streamStackStates(std::ostream& os, const std::map<CFStac
             }
         }
     os << std::endl;
+    return os;
 }
 
 void Program::findCreatedContracts() {
@@ -356,10 +360,12 @@ void Program::findCreatedContracts() {
                             std::vector<uint8_t> newBC;
                             auto offset = rLoc - mLoc;
                             for (int i = mOffset - offset; i < mOffset + rSize - offset; i++) {
-                                newBC.push_back(byteCode[i]);
+                                if(byteCode.size() > i)
+                                    newBC.push_back(byteCode[i]);
                             }
 
-                            createdContracts.emplace_back(std::make_shared<Program>(newBC));
+                            if(!newBC.empty())
+                                createdContracts.emplace_back(std::make_shared<Program>(newBC));
                         }
 
                         break;
@@ -368,6 +374,13 @@ void Program::findCreatedContracts() {
             }
         }
 
+    }
+}
+
+Program::~Program() {
+    for(auto& n : nodes) {
+        if(n.second)
+            n.second->ClearNextAndPrev();
     }
 }
 

@@ -39,6 +39,7 @@ public:
     }
 
     Program(const std::vector<uint8_t> &byteCode);
+    ~Program();
 
     void print(bool showStackOps, bool showUnreachable);
 

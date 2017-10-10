@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <unordered_set>
 #include "CFStackEntry.h"
 #include "Program.h"
 
@@ -24,8 +25,12 @@ public:
     std::string label = "";
 
     bool IsReachable() const;
-    const std::set<std::shared_ptr<CFNode>>& NextNodes() const { return next; }
-    const std::set<std::shared_ptr<CFNode>>& PrevNodes() const { return prev; }
+    void ClearNextAndPrev() {
+        next.clear();
+        prev.clear();
+    }
+    const std::set<std::shared_ptr<CFNode>>& NextNodes() const;
+    const std::set<std::shared_ptr<CFNode>>& PrevNodes() const;
     void AddNext(const std::shared_ptr<CFNode>& next);
     std::vector<std::shared_ptr<CFInstruction>> Instructions(const Program& p) const;
     bool hasUnknownOpCodes(const Program& p) const;

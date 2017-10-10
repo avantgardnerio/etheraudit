@@ -44,7 +44,7 @@ bool CFNode::IsReachable() const {
         if(prev.empty()) {
             return false;
         }
-        for(auto& p : prev) {
+        for(auto& p : PrevNodes()) {
             if(p->IsReachable()) {
                 return isReachable = true;
             }
@@ -74,3 +74,20 @@ bool CFNode::HasPossibleExitStackStates() const {
     }
     return false;
 }
+
+static const std::set<std::shared_ptr<CFNode>> weakSetToShared(const std::set<std::weak_ptr<CFNode>>& set) {
+    std::set<std::shared_ptr<CFNode>> rtn;
+    for(auto& s : set)
+        if(auto i = s.lock())
+            rtn.insert(i);
+    return rtn;
+}
+
+const std::set<std::shared_ptr<CFNode>>& CFNode::NextNodes() const {
+    return next;
+}
+
+const std::set<std::shared_ptr<CFNode>>& CFNode::PrevNodes() const {
+    return prev;
+}
+
