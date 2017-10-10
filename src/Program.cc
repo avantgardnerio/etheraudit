@@ -127,7 +127,7 @@ void Program::startGraph() {
             continue;
         seen.insert(pos);
 
-        auto node = nodes[pos];
+        auto node = GetNodeExactlyAt(pos);
         assert(node);
         auto lastInstr = node->lastInstruction(*this);
         assert(lastInstr);
@@ -145,13 +145,12 @@ void Program::startGraph() {
             auto& jumpTo = lastInstr->operands.front();
             int64_t nextAddr = 0;
             if(jumpTo.isConstant && getInt64FromVec(jumpTo.constantValue, &nextAddr)) {
-                if(auto& next = nodes[ nextAddr ]) {
+                if(auto next = GetNodeExactlyAt(nextAddr)) {
                     //assert(next->isJumpDest);
                     if(next->isJumpDest)
                         node->AddNext(next);
                     else
-                        std::cerr << "Disallowing jump from " << node->idx << "  to " << next->idx << std::endl;
-
+                        this->AddIssue(pos, "Invalid jump from " + std::to_string(node->idx) + " to " + std::to_string(next->idx));
                 }
             }
         }
@@ -182,9 +181,6 @@ void Program::solveStack(size_t& globalIdx,
 
     auto nodeInstructions = node->Instructions(*this);
     size_t argumentIdx = 0;
-    if(possibleStackStarts.size() > 50) {
-        //streamStackStates(std::cerr, possibleStackStarts);
-    }
     for(auto& _possibleStackStart : possibleStackStarts) {
         auto stack = _possibleStackStart.first;
 
@@ -234,13 +230,12 @@ void Program::solveStack(size_t& globalIdx,
                !instruction->operands.empty() &&
                instruction->operands.front().isConstant &&
                getInt64FromVec(instruction->operands.front().constantValue, &jumpLoc)) {
-                if(auto jumpNode = nodes[jumpLoc]) {
+                if(auto jumpNode = GetNodeExactlyAt(jumpLoc)) {
                     //assert(jumpNode->isJumpDest);
                     if(jumpNode->isJumpDest)
                         node->AddNext(jumpNode);
                     else
-                        std::cerr << "Disallowing jump from " << node->idx << "  to " << jumpNode->idx << std::endl;
-
+                        this->AddIssue(pos, "Invalid jump from " + std::to_string(node->idx) + " to " + std::to_string(jumpNode->idx));
                 }
             }
 
@@ -407,7 +402,7 @@ bool Program::IsValid() const {
 
 void Program::AddIssue(size_t offset, const std::string &msg) {
     issues.emplace_back(offset, msg);
-    std::cerr << issues.back();
+    std::cerr << issues.back() << std::endl;
 }
 
 std::shared_ptr<CFNode> Program::GetNode(size_t offset) const {
@@ -425,6 +420,13 @@ std::shared_ptr<CFNode> Program::GetNode(size_t offset) const {
 
 std::shared_ptr<CFNode> Program::GetNode(const CFInstruction &instruction) const {
     return GetNode(instruction.offset);
+}
+
+std::shared_ptr<CFNode> Program::GetNodeExactlyAt(size_t offset) const {
+    auto it = nodes.find(offset);
+    if(it != nodes.end())
+        return it->second;
+    return nullptr;
 }
 
 std::ostream &operator<<(std::ostream &os, const ProgramReport &report) {

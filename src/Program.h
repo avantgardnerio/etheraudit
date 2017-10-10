@@ -56,6 +56,7 @@ public:
     const std::map<size_t, std::shared_ptr<CFNode> >& Nodes() const { return nodes; };
 
     const std::map<size_t, CFSymbolInfo>& Symbols() const { return symbols; };
+    std::shared_ptr<CFNode> GetNodeExactlyAt(size_t offset) const;
     std::shared_ptr<CFNode> GetNode(size_t offset) const;
     std::shared_ptr<CFNode> GetNode(const CFInstruction& instruction) const;
     std::shared_ptr<CFInstruction> GetInstructionByOffset(size_t offset) const {
