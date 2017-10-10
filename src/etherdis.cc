@@ -10,6 +10,7 @@
 
 #include "OpCodes.h"
 #include "Program.h"
+#include "AuditResult.h"
 
 std::vector<uint8_t> parseByteCodeString(const std::string &str) {
     const char *buff = str.c_str();
@@ -37,7 +38,7 @@ std::string readFile(std::ifstream &fs) {
     return rtn;
 }
 
-void createOutDir(const std::string& dir, const Program &program) {
+void createOutDir(const std::string &dir, const Program &program) {
     mkdir(dir.c_str(), S_IRWXU);
 
     {
@@ -56,9 +57,38 @@ void createOutDir(const std::string& dir, const Program &program) {
         fs << PsuedoStackReport(program);
     }
 
+    if (!program.Issues().empty()) {
+        std::ofstream fs(dir + "/issues.log");
+        for (auto &issue : program.Issues()) {
+            fs << issue << std::endl;
+        }
+        fs << std::endl;
+    }
+
+    {
+        std::ofstream fs(dir + "/audit.log");
+        AuditResults audit = AuditForEverything(program);
+        for (auto &item : audit) {
+            fs << "At offset " << item.Offset()
+               << ": (" << item.Type().Severity() << ") "
+               << item.Type().Message() << std::endl;
+        }
+    }
+    {
+        std::ofstream fs(dir + "/symbols.txt");
+        for (auto &symbol : program.Symbols()) {
+            fs << "<#" << symbol.first << "> (" << symbol.second.createdAt << "): " << symbol.second.ToString(program) << std::endl;
+            fs << "Used at: ";
+            for(auto& use : symbol.second.usedAt) {
+                fs << use << " ";
+            }
+            fs << std::endl;
+        }
+    }
+
     size_t i = 0;
-    for(auto& cc : program.createdContracts) {
-        if(!cc) continue;
+    for (auto &cc : program.createdContracts) {
+        if (!cc) continue;
 
         std::stringstream ss;
         ss << "creates." << i++;
@@ -91,7 +121,7 @@ int main(int argc, const char **argv) {
             farg_start = i;
     }
 
-    for(size_t farg = farg_start; farg < argc;farg++) {
+    for (size_t farg = farg_start; farg < argc; farg++) {
         std::string fileName = argv[farg];
         std::ifstream f(fileName);
         assert(f);

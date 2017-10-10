@@ -6,9 +6,10 @@
 #include "CFInstruction.h"
 #include "Utils.h"
 
-CFInstruction::CFInstruction(size_t offset, const OpCodes::OpCode &opCode, const std::vector<uint8_t> &data) : offset(offset),
-                                                                                                               opCode(opCode),
-                                                                                                               data(data) {}
+CFInstruction::CFInstruction(const Program &program, size_t offset, const OpCodes::OpCode &opCode,
+                             const std::vector<uint8_t> &data) : program(program), offset(offset),
+                                                                                   opCode(opCode),
+                                                                                   data(data) {}
 
 void CFInstruction::simplify() {
     if(opCode.dupNum() != -1) {
@@ -34,10 +35,31 @@ void CFInstruction::simplify() {
         }
 
         if(allInputsConstant) {
-            outputs[0].isConstant = true;
-            outputs[0].constantValue = getVecFromInt64(opCode.Solve(inputs));
+            try {
+                outputs[0].constantValue = getVecFromInt64(opCode.Solve(inputs));
+                outputs[0].isConstant = true;
+            } catch(std::exception& e) {
+                std::cerr << e.what() << std::endl;
+            }
         }
     }
+}
+
+
+bool CFInstruction::allOutputsSingleUse() const {
+    if(outputs.empty())
+        return false;
+    
+    for(auto& op : outputs) {
+        if(op.isSymbol()) {
+            auto it = program.Symbols().find(op.idx);
+            assert(it != program.Symbols().end());
+            if(it != program.Symbols().end() && it->second.usedAt.size() > 1) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 bool CFInstruction::allOperandsConstant() const {
@@ -49,10 +71,13 @@ bool CFInstruction::allOperandsConstant() const {
 }
 
 std::ostream &operator<<(std::ostream &os, const CFInstruction &instruction) {
-    return instruction.Stream(os);
+    return instruction.Stream(os, true);
 }
 
-std::ostream &CFInstruction::Stream(std::ostream& os) const {
+std::ostream &CFInstruction::Stream(std::ostream &os, bool showAllOps) const {
+    if(allOutputsSingleUse() && !showAllOps)
+        return os;
+
     os << "\t";
     os.width(4); os.fill(' '); os << std::dec << offset;
     os << " (0x";
@@ -73,7 +98,13 @@ std::ostream &CFInstruction::Stream(std::ostream& os) const {
         os << opCode.name << "(";
 
         for (size_t i = 0; i < operands.size(); i++) {
-            os << operands[i];
+
+            auto it = program.Symbols().find(operands[i].idx);
+            if(!showAllOps && it != program.Symbols().end() && it->second.usedAt.size() == 1) {
+                os << it->second.ToString(program);
+            } else {
+                os << operands[i];
+            }
             if(i != operands.size() - 1)
                 os << ", ";
         }

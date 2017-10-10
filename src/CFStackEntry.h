@@ -9,6 +9,7 @@ struct CFStackEntry {
     bool isConstant = false;
     std::vector<uint8_t> constantValue;
 
+    bool isSymbol() const;
     bool getConstantInt(int64_t* v);
 
     friend std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry);

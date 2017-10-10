@@ -147,8 +147,13 @@ int64_t OpCodes::OpCode::Solve(const std::vector<int64_t> &input) const {
         case OP_EQ:
             assert(input.size() == 2);
             return input[0] == input[1];
+        case OP_SDIV:
+            assert(input.size() == 2);
+            if(input[1] == 0)
+                return 0;
+            return input[0] / input[1];
         default:
-            assert(false && "Please add the logic!");
+            throw std::runtime_error(std::string("Don't have the logic enabled for ") + name);
     }
     return 0;
 }

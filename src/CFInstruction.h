@@ -19,16 +19,19 @@ struct CFInstruction {
     const OpCodes::OpCode& opCode;
     std::vector<uint8_t> data;
 
-    CFInstruction(size_t offset, const OpCodes::OpCode &opCode, const std::vector<uint8_t> &data = {});
+    CFInstruction(const Program &program, size_t offset, const OpCodes::OpCode &opCode, const std::vector<uint8_t> &data = {});
 
     std::vector<CFStackEntry> operands;
     std::vector<CFStackEntry> outputs;
 
+    bool allOutputsSingleUse() const;
     bool allOperandsConstant() const;
 
     void simplify();
 
-    std::ostream& Stream(std::ostream& os) const;
+    std::ostream &Stream(std::ostream &os, bool showAllOps) const;
+
+    const Program& program;
 
     friend std::ostream &operator<<(std::ostream &os, const CFInstruction &instruction);
 };

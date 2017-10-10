@@ -66,3 +66,11 @@ bool CFStackEntry::operator<=(const CFStackEntry &rhs) const {
 bool CFStackEntry::operator>=(const CFStackEntry &rhs) const {
     return !(*this < rhs);
 }
+
+bool CFStackEntry::isSymbol() const {
+    if(isConstant)
+        return false;
+    if(!label.empty())
+        return false;
+    return true;
+}

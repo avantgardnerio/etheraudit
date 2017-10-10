@@ -8,4 +8,4 @@ add_executable(etherdis etherdis.cc opcodes_xx.h
         CFStackEntry.cc CFStackEntry.h
         CFNode.cc CFNode.h
         CFInstruction.cc CFInstruction.h
-        Utils.cc Utils.h)
+        Utils.cc Utils.h AuditResult.cc AuditResult.h)

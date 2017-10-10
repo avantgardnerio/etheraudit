@@ -23,7 +23,7 @@ void Program::fillInstructions() {
     size_t globalIdx = 0;
     size_t* jumpIdx = 0;
     OpCodes::iterate(byteCode, [&](const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode){
-        instructions[pos] = std::make_shared<CFInstruction>(pos, opCode);
+        instructions[pos] = std::make_shared<CFInstruction>(*this, pos, opCode);
 
         if(opCode.opCode == OpCodes::OP_JUMPDEST) {
             jumpdests[pos] = 0;
@@ -45,6 +45,9 @@ void Program::fillInstructions() {
                 stack.push_back(entry);
             }
 
+            if(!opCode.isStackManipulatorOnly() && symbols.find(stack.back().idx) != symbols.end()) {
+                symbols[stack.back().idx].usedAt.insert(pos);
+            }
             instructions[pos]->operands.emplace_back(stack.back());
             stack.pop_back();
         }
@@ -64,6 +67,10 @@ void Program::fillInstructions() {
         instructions[pos]->simplify();
         for (auto it = instructions[pos]->outputs.rbegin();
              it != instructions[pos]->outputs.rend();it++) {
+            if(it->label.empty() && !it->isConstant && symbols.find(it->idx) == symbols.end()) {
+                symbols[it->idx].idx = it->idx;
+                symbols[it->idx].createdAt = pos;
+            }
             stack.push_back(*it);
         }
 
@@ -247,14 +254,16 @@ void Program::solveStack(size_t& globalIdx,
     }
 }
 
-void Program::solveStack() {
+bool Program::solveStack() {
     typedef std::pair< std::shared_ptr<CFNode>,
             std::shared_ptr<CFNode> > NodePair;
     std::set< NodePair > seen;
     std::vector< NodePair > todo;
     size_t globalIdx = 0;
 
-    assert(nodes[0]);
+    if(nodes.empty() || nodes[0] == nullptr)
+        return false;
+
     todo.emplace_back(nodes[0], nullptr);
     while(!todo.empty()) {
         auto pos = todo.back();
@@ -274,6 +283,8 @@ void Program::solveStack() {
                 todo.emplace_back(n, node);
         }
     }
+
+    return true;
 }
 
 Program::Program(const std::vector<uint8_t> &byteCode) : byteCode(byteCode) {
@@ -333,6 +344,7 @@ void Program::findCreatedContracts() {
         auto nodeInstructions = node->Instructions(*this);
         if(!node->IsReachable())
             continue;
+
         for (auto &instr : nodeInstructions) {
             if (!instr)
                 continue;
@@ -364,8 +376,11 @@ void Program::findCreatedContracts() {
                                     newBC.push_back(byteCode[i]);
                             }
 
-                            if(!newBC.empty())
-                                createdContracts.emplace_back(std::make_shared<Program>(newBC));
+                            if(!newBC.empty()) {
+                                auto contract = std::make_shared<Program>(newBC);
+                                if(contract->IsValid())
+                                    createdContracts.emplace_back(contract);
+                            }
                         }
 
                         break;
@@ -382,6 +397,28 @@ Program::~Program() {
         if(n.second)
             n.second->ClearNextAndPrev();
     }
+}
+
+bool Program::IsValid() const {
+    if(instructions.empty())
+        return false;
+    return true;
+}
+
+void Program::AddIssue(size_t offset, const std::string &msg) {
+    issues.emplace_back(offset, msg);
+    std::cerr << issues.back();
+}
+
+std::shared_ptr<CFNode> Program::GetNode(size_t offset) const {
+    auto node = nodes.lower_bound(offset);
+    assert(node != nodes.end() && node->second &&
+                   node->second->start >= offset && node->second->end <= offset);
+    return node->second;
+}
+
+std::shared_ptr<CFNode> Program::GetNode(const CFInstruction &instruction) const {
+    return GetNode(instruction.offset);
 }
 
 std::ostream &operator<<(std::ostream &os, const ProgramReport &report) {
@@ -443,8 +480,10 @@ std::ostream &DisassemReport::Stream(std::ostream &os) const {
         for(size_t i = node->start;i < node->end;i++) {
             //if(instructions[i] && !instructions[i]->opCode.isStackManipulatorOnly())
             if(auto instr = program.GetInstructionByOffset(i))
-                if(shouldPrintStackOps || !instr->opCode.isStackManipulatorOnly())
-                    os << *instr;
+                if(shouldPrintStackOps || !instr->opCode.isStackManipulatorOnly()) {
+                    instr->Stream(os, shouldPrintStackOps);
+                }
+
         }
 
     }
@@ -476,4 +515,34 @@ std::ostream &PsuedoStackReport::Stream(std::ostream &os) const {
     }
 
     return os;
+}
+
+AnalysisIssue::AnalysisIssue(size_t offset, const std::string &message) : offset(offset), message(message) {}
+
+std::ostream &operator<<(std::ostream &os, const AnalysisIssue &issue) {
+    os << "At offset: " << issue.offset << ": " << issue.message;
+    return os;
+}
+
+std::string CFSymbolInfo::ToString(const Program &p) const {
+    auto instr = p.GetInstructionByOffset(createdAt);
+    std::stringstream ss;
+    assert(instr);
+    ss << instr->opCode.name << "(";
+    bool isFirst = true;
+    for(auto& op : instr->operands) {
+        if(!isFirst)
+            ss << ", ";
+        isFirst = false;
+
+        if(op.isConstant || !op.label.empty()) {
+            ss << op;
+        } else {
+            auto sit = p.Symbols().find(op.idx);
+            assert(sit != p.Symbols().end());
+            ss << sit->second.ToString(p);
+        }
+    }
+    ss << ")";
+    return ss.str();
 }
