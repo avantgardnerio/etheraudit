@@ -193,3 +193,39 @@ bool OpCodes::OpCode::isFallThrough() const {
 bool OpCodes::OpCode::isUnknown() const {
     return strncmp(name.c_str(), "UNKNOWN", strlen("UNKNOWN") - 1) == 0;
 }
+
+std::string OpCodes::OpCode::Infix() const {
+    switch(opCode) {
+        case OP_EXP:
+            return "**";
+        case OP_DIV:
+            return "/";
+        case OP_NOT:
+            return "!";
+        case OP_ISZERO:
+            return "0 == ";
+        case OP_SUB:
+            return "-";
+        case OP_OR:
+            return "||";
+        case OP_AND:
+            return "&";
+        case OP_ADD:
+            return "+";
+        case OP_GT:
+            return ">";
+        case OP_LT:
+            return "<";
+        case OP_XOR:
+            return "^";
+        case OP_MUL:
+            return "*";
+        case OP_MOD:
+            return "%";
+        case OP_EQ:
+            return "==";
+        case OP_SDIV:
+            return "//";
+    }
+    return "";
+}

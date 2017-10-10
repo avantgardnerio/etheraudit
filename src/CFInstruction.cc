@@ -103,6 +103,13 @@ std::ostream &CFInstruction::Stream(std::ostream &os, bool showAllOps) const {
             if(!showAllOps && it != program.Symbols().end() && it->second.usedAt.size() == 1) {
                 os << it->second.ToString(program);
             } else {
+                int64_t addr = 0;
+                if(operands[i].isConstant && getInt64FromVec(operands[i].constantValue, &addr)) {
+                    if(auto n = program.GetNode(addr)) {
+                        if(n->isJumpDest && n->start == addr)
+                            os << " (loc_" << std::dec << n->idx << ") ";
+                    }
+                }
                 os << operands[i];
             }
             if(i != operands.size() - 1)

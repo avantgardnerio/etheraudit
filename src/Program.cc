@@ -412,8 +412,14 @@ void Program::AddIssue(size_t offset, const std::string &msg) {
 
 std::shared_ptr<CFNode> Program::GetNode(size_t offset) const {
     auto node = nodes.lower_bound(offset);
+    while(node != nodes.end() && (node->second == nullptr || node->second->start > offset))
+        node--;
+
+    if(node == nodes.end())
+        return nullptr;
+
     assert(node != nodes.end() && node->second &&
-                   node->second->start >= offset && node->second->end <= offset);
+                   node->second->start <= offset && node->second->end >= offset);
     return node->second;
 }
 
@@ -528,14 +534,28 @@ std::string CFSymbolInfo::ToString(const Program &p) const {
     auto instr = p.GetInstructionByOffset(createdAt);
     std::stringstream ss;
     assert(instr);
-    ss << instr->opCode.name << "(";
+    auto infix = instr->operands.size() <= 2 ? instr->opCode.Infix() : "";
+    if(infix.empty()) {
+        ss << instr->opCode.name;
+    }
+
+    ss << "(";
     bool isFirst = true;
-    for(auto& op : instr->operands) {
-        if(!isFirst)
-            ss << ", ";
+
+    if(instr->operands.size() == 1)
+        ss << infix;
+
+    for (auto &op : instr->operands) {
+        if (!isFirst) {
+            if(infix.empty()) {
+                ss << ", ";
+            } else if(instr->operands.size() > 1){
+                ss << " " << infix << " ";
+            }
+        }
         isFirst = false;
 
-        if(op.isConstant || !op.label.empty()) {
+        if (op.isConstant || !op.label.empty()) {
             ss << op;
         } else {
             auto sit = p.Symbols().find(op.idx);
@@ -544,5 +564,6 @@ std::string CFSymbolInfo::ToString(const Program &p) const {
         }
     }
     ss << ")";
+
     return ss.str();
 }

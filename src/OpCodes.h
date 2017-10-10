@@ -24,6 +24,8 @@ namespace OpCodes {
         int swapNum() const;
         int pushNum() const;
 
+        std::string Infix() const;
+
         bool isStop() const;
         bool isStackManipulatorOnly() const;
         bool isArithmetic() const;
