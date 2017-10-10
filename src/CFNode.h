@@ -42,3 +42,4 @@ public:
     bool HasPossibleExitStackStates() const;
     std::map<std::vector<CFStackEntry>, std::vector<std::vector<size_t>> > possibleExitStackStates;
 };
+

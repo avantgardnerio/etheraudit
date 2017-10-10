@@ -572,3 +572,38 @@ std::string CFSymbolInfo::ToString(const Program &p) const {
 
     return ss.str();
 }
+
+const KnownEntryPoint *GetKnownEntryPoint(int64_t hash) {
+    static std::map<int64_t, KnownEntryPoint> knownEntryPoints;
+    static bool isInitialized = false;
+    if(!isInitialized) {
+        isInitialized = true;
+        std::ifstream fs("/keybase/team/jbchackerspace/contract-data/entryPoints.csv");
+
+        std::string line;
+        while(std::getline(fs, line)) {
+            std::stringstream ss; ss << line;
+            std::string addr;
+            int argCount;
+
+            KnownEntryPoint entryPoint;
+            ss >> addr >> entryPoint.name >> argCount;
+
+            entryPoint.hash = strtol(addr.c_str(), 0, 16);
+
+            entryPoint.arguments.resize(argCount);
+            for(int i = 0;i < argCount;i++) {
+                ss >> entryPoint.arguments[i].name;
+            }
+
+            for(int i = 0;i < argCount;i++) {
+                ss >> entryPoint.arguments[i].type;
+            }
+            knownEntryPoints[entryPoint.hash] = entryPoint;
+        }
+    }
+    auto it = knownEntryPoints.find(hash);
+    if(it != knownEntryPoints.end())
+        return &it->second;
+    return nullptr;
+}

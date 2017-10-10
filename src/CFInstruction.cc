@@ -109,6 +109,9 @@ std::ostream &CFInstruction::Stream(std::ostream &os, bool showAllOps) const {
                         if(n->isJumpDest && n->start == addr)
                             os << " (loc_" << std::dec << n->idx << ") ";
                     }
+                    if(auto entryPoint = GetKnownEntryPoint(addr)) {
+                        os << " (possible entry: " << entryPoint->name << ") ";
+                    }
                 }
                 os << operands[i];
             }

@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 #include <ostream>
+#include <fstream>
 
 #include "CFStackEntry.h"
 #include "CFNode.h"
@@ -18,6 +19,17 @@ typedef std::vector<CFStackEntry> CFStack;
 typedef std::vector<size_t> executionPath;
 class CFNode;
 class CFInstruction;
+
+struct KnownEntryPoint {
+    struct Argument {
+        std::string type, name;
+    };
+    std::vector<Argument> arguments;
+    std::string name;
+    int64_t hash;
+};
+
+const KnownEntryPoint* GetKnownEntryPoint(int64_t hash);
 
 struct AnalysisIssue {
     size_t offset;
