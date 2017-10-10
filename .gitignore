@@ -16,3 +16,6 @@ cmake-build-debug
 *.iml
 *.iws
 .vscode
+
+# BC files
+*.bc
