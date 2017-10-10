@@ -7,7 +7,7 @@ for dir in md5-*; do
     for file in $dir/0x*; do
 	amt=`cat $file`
 	amtf=`printf "%f" $amt`
-	if ((`echo "$amtf > 10" | bc -l` )); then
+	if ((`echo "$amtf > 100" | bc -l` )); then
 	    contractFile=${file##*/}
 	    contractId=${contractFile%.*}
 	    echo $contractId

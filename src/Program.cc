@@ -406,12 +406,15 @@ void Program::AddIssue(size_t offset, const std::string &msg) {
 }
 
 std::shared_ptr<CFNode> Program::GetNode(size_t offset) const {
+    if(offset >= byteCode.size())
+        return nullptr;
+
     auto node = nodes.lower_bound(offset);
     while(node != nodes.end() && (node->second == nullptr || node->second->start > offset))
         node--;
 
     if(node == nodes.end())
-        return nullptr;
+        nullptr;
 
     assert(node != nodes.end() && node->second &&
                    node->second->start <= offset && node->second->end >= offset);
