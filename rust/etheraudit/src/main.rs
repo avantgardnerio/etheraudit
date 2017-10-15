@@ -1,16 +1,19 @@
 #![feature(iterator_step_by)]
+#[macro_use]
+extern crate lazy_static;
 
 extern crate ethcore;
 extern crate ethcore_devtools;
 extern crate ethcore_io;
 extern crate ethcore_util;
 extern crate ethkey;
-extern crate evm;
 
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::btree_map::BTreeMap;
+
+mod instructions;
 
 type ByteCode = std::vec::Vec<u8>;
 
@@ -21,8 +24,8 @@ struct Instruction {
 }
 
 impl Instruction {
-    pub fn new(offset: usize, opCode: u8) -> Self {
-        Instruction {offset, op_code: opCode, data: std::vec::Vec::new()}
+    pub fn new(offset: usize, op_code: u8) -> Self {
+        Instruction {offset, op_code: op_code, data: std::vec::Vec::new()}
     }
 }
 
@@ -42,18 +45,47 @@ impl Block {
 
 struct Program {
     byte_code: ByteCode,
-    instructions: BTreeMap<usize, Instruction>
+    instructions: BTreeMap<usize, Instruction>,
+    blocks: BTreeMap<usize, Block>
+}
+
+
+fn is_stop(op_code: u8) -> bool {
+    return op_code == instructions::STOP ||
+        op_code == instructions::RETURN;
 }
 
 fn is_jump(op_code: u8) -> bool {
-    return false; //op_code == evm::JUMP || op_code == evm::JUMPI;
+    return op_code == instructions::JUMP ||
+        op_code == instructions::JUMPI;
 }
 
 impl Program {
     pub fn fill_blocks(self: &mut Program) {
-        let mut lastStart = 0;
-        for (pos, instr) in &self.instructions {
+        let mut start = 0;
+        let mut this_end = Some(0);
 
+        for (pos, instr) in &self.instructions {
+            if instr.op_code == instructions::JUMPDEST {
+                match this_end {
+                    Some(end) => { self.blocks.insert(start, Block::new(start, end)); },
+                    None => {}
+                }
+                start = *pos;
+            }
+
+            this_end = Some(pos + instr.data.len() + 1);
+            if is_jump(instr.op_code) || is_stop(instr.op_code) {
+                match this_end {
+                    Some(end) => {
+                        self.blocks.insert(start, Block::new(start, end));
+                        start = end;
+                    },
+                    None => {}
+                }
+
+                this_end = None;
+            }
         }
     }
 
@@ -66,7 +98,7 @@ impl Program {
             let instr = &mut self.instructions.get_mut(&offset).expect("but I just added it!");
 
             offset += 1;
-            for idx in 0..evm::push_bytes(bc) {
+            for _ in 0..instructions::push_bytes(bc) {
                 if offset < self.byte_code.len() {
                     instr.data.push(self.byte_code[offset]);
                 }
@@ -79,6 +111,7 @@ impl Program {
         let mut rtn = Program {
             byte_code,
             instructions: BTreeMap::new(),
+            blocks: BTreeMap::new()
         };
 
         rtn.fill_instructions();
@@ -104,14 +137,23 @@ fn read_file(file_name: &String) {
         byte_code.push(ibc);
     }
 
-    let mut p = Program::new(byte_code);
+    let p = Program::new(byte_code);
 
-    for (pos, instr) in p.instructions {
-        println!("{} {:?}", evm::INSTRUCTIONS[instr.op_code as usize].name, instr.data);
+    for (_, block) in p.blocks {
+        println!("Block {} {}", block.start, block.end);
+        for pos in block.start..block.end {
+            match p.instructions.get(&pos) {
+                Some(instr) => {
+                    println!("{}\t{} {:?}", pos, instructions::INSTRUCTIONS[instr.op_code as usize].name, instr.data);
+                }, None => {}
+            }
+        }
+        println!("");
     }
 }
 
 fn main() {
-    let file_name = env::args().nth(1).expect("Please provide a file");
+    let def_file = "/home/justin/source/etheraudit/cpp/0x273930d21e01ee25e4c219b63259d214872220a2.bc".to_string();
+    let file_name = env::args().nth(1).unwrap_or(def_file);
     read_file(&file_name);
 }

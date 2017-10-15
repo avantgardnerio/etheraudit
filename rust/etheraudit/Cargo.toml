@@ -10,3 +10,5 @@ ethcore-devtools = { git = "https://github.com/paritytech/parity" }
 ethcore-io       = { git = "https://github.com/paritytech/parity" }
 ethcore-util     = { git = "https://github.com/paritytech/parity" }
 ethkey           = { git = "https://github.com/paritytech/parity" }
+lazy_static = "0.2"
+arrayvec = "0.3"

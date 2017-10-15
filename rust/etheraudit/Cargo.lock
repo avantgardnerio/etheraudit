@@ -2,12 +2,14 @@
 name = "etheraudit"
 version = "0.1.0"
 dependencies = [
+ "arrayvec 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethcore 1.9.0 (git+https://github.com/paritytech/parity)",
  "ethcore-devtools 1.9.0 (git+https://github.com/paritytech/parity)",
  "ethcore-io 1.9.0 (git+https://github.com/paritytech/parity)",
  "ethcore-util 1.9.0 (git+https://github.com/paritytech/parity)",
  "ethkey 0.2.0 (git+https://github.com/paritytech/parity)",
  "evm 0.1.0 (git+https://github.com/paritytech/parity)",
+ "lazy_static 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
