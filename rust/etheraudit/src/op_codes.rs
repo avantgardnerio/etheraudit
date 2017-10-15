@@ -9,6 +9,16 @@ pub fn is_push(i: Instruction) -> bool {
 	i >= PUSH1 && i <= PUSH32
 }
 
+pub fn is_stop(op_code: u8) -> bool {
+	return op_code == STOP ||
+		op_code == RETURN;
+}
+
+pub fn is_jump(op_code: u8) -> bool {
+	return op_code == JUMP ||
+		op_code == JUMPI;
+}
+
 #[test]
 fn test_is_push() {
 	assert!(is_push(PUSH1));
@@ -126,7 +136,7 @@ pub fn get_tier_idx (tier: GasPriceTier) -> usize {
 
 /// EVM instruction information.
 #[derive(Copy, Clone, Default)]
-pub struct InstructionInfo {
+pub struct OpCodeInfo {
 	/// Mnemonic name.
 	pub name: &'static str,
 	pub op_code: u8,
@@ -138,10 +148,10 @@ pub struct InstructionInfo {
 	pub tier: GasPriceTier
 }
 
-impl InstructionInfo {
+impl OpCodeInfo {
 	/// Create new instruction info.
 	pub fn new(name: &'static str, op_code: u8, args: usize, ret: usize, tier: GasPriceTier) -> Self {
-		InstructionInfo {
+		OpCodeInfo {
 			name: name,
 			op_code: op_code,
 			args: args,
@@ -153,147 +163,147 @@ impl InstructionInfo {
 
 lazy_static! {
 	/// Static instruction table.
-	pub static ref INSTRUCTIONS: [InstructionInfo; 0x100] = {
-		let mut arr : [InstructionInfo; 0x100] = (0..0x100).map(|i|{
-		     InstructionInfo::new("", i as u8, 0, 0, GasPriceTier::Special)
+	pub static ref OPCODES: [OpCodeInfo; 0x100] = {
+		let mut arr : [OpCodeInfo; 0x100] = (0..0x100).map(|i|{
+		     OpCodeInfo::new("", i as u8, 0, 0, GasPriceTier::Special)
 		}).collect::<ArrayVec<_>>().into_inner()
         .unwrap_or_else(|_| unreachable!());
 
-		arr[STOP as usize] =			InstructionInfo::new("STOP", STOP,			0, 0, GasPriceTier::Zero);
-		arr[ADD as usize] = 			InstructionInfo::new("ADD", ADD,				2, 1, GasPriceTier::VeryLow);
-		arr[SUB as usize] = 			InstructionInfo::new("SUB", SUB,				2, 1, GasPriceTier::VeryLow);
-		arr[MUL as usize] = 			InstructionInfo::new("MUL", MUL,				2, 1, GasPriceTier::Low);
-		arr[DIV as usize] = 			InstructionInfo::new("DIV", DIV,				2, 1, GasPriceTier::Low);
-		arr[SDIV as usize] =			InstructionInfo::new("SDIV", SDIV,			2, 1, GasPriceTier::Low);
-		arr[MOD as usize] = 			InstructionInfo::new("MOD", MOD,				2, 1, GasPriceTier::Low);
-		arr[SMOD as usize] =			InstructionInfo::new("SMOD", SMOD,			2, 1, GasPriceTier::Low);
-		arr[EXP as usize] = 			InstructionInfo::new("EXP", EXP,				2, 1, GasPriceTier::Special);
-		arr[NOT as usize] = 			InstructionInfo::new("NOT", NOT,				1, 1, GasPriceTier::VeryLow);
-		arr[LT as usize] =				InstructionInfo::new("LT", LT,				2, 1, GasPriceTier::VeryLow);
-		arr[GT as usize] =				InstructionInfo::new("GT", GT,				2, 1, GasPriceTier::VeryLow);
-		arr[SLT as usize] = 			InstructionInfo::new("SLT", SLT,				2, 1, GasPriceTier::VeryLow);
-		arr[SGT as usize] = 			InstructionInfo::new("SGT", SGT,				2, 1, GasPriceTier::VeryLow);
-		arr[EQ as usize] =				InstructionInfo::new("EQ", EQ,				2, 1, GasPriceTier::VeryLow);
-		arr[ISZERO as usize] =			InstructionInfo::new("ISZERO", ISZERO,			1, 1, GasPriceTier::VeryLow);
-		arr[AND as usize] = 			InstructionInfo::new("AND", AND,				2, 1, GasPriceTier::VeryLow);
-		arr[OR as usize] =				InstructionInfo::new("OR", OR,				2, 1, GasPriceTier::VeryLow);
-		arr[XOR as usize] = 			InstructionInfo::new("XOR", XOR,				2, 1, GasPriceTier::VeryLow);
-		arr[BYTE as usize] =			InstructionInfo::new("BYTE", BYTE,			2, 1, GasPriceTier::VeryLow);
-		arr[ADDMOD as usize] =			InstructionInfo::new("ADDMOD", ADDMOD,			3, 1, GasPriceTier::Mid);
-		arr[MULMOD as usize] =			InstructionInfo::new("MULMOD", MULMOD,			3, 1, GasPriceTier::Mid);
-		arr[SIGNEXTEND as usize] =		InstructionInfo::new("SIGNEXTEND", SIGNEXTEND,		2, 1, GasPriceTier::Low);
-		arr[RETURNDATASIZE as usize] =	InstructionInfo::new("RETURNDATASIZE", RETURNDATASIZE,	0, 1, GasPriceTier::Base);
-		arr[RETURNDATACOPY as usize] =	InstructionInfo::new("RETURNDATACOPY", RETURNDATACOPY,	3, 0, GasPriceTier::VeryLow);
-		arr[SHA3 as usize] =			InstructionInfo::new("SHA3", SHA3,			2, 1, GasPriceTier::Special);
-		arr[ADDRESS as usize] = 		InstructionInfo::new("ADDRESS", ADDRESS,			0, 1, GasPriceTier::Base);
-		arr[BALANCE as usize] = 		InstructionInfo::new("BALANCE", BALANCE,			1, 1, GasPriceTier::Special);
-		arr[ORIGIN as usize] =			InstructionInfo::new("ORIGIN", ORIGIN,			0, 1, GasPriceTier::Base);
-		arr[CALLER as usize] =			InstructionInfo::new("CALLER", CALLER,			0, 1, GasPriceTier::Base);
-		arr[CALLVALUE as usize] =		InstructionInfo::new("CALLVALUE", CALLVALUE,		0, 1, GasPriceTier::Base);
-		arr[CALLDATALOAD as usize] =	InstructionInfo::new("CALLDATALOAD", CALLDATALOAD,	1, 1, GasPriceTier::VeryLow);
-		arr[CALLDATASIZE as usize] =	InstructionInfo::new("CALLDATASIZE", CALLDATASIZE,	0, 1, GasPriceTier::Base);
-		arr[CALLDATACOPY as usize] =	InstructionInfo::new("CALLDATACOPY", CALLDATACOPY,	3, 0, GasPriceTier::VeryLow);
-		arr[CODESIZE as usize] =		InstructionInfo::new("CODESIZE", CODESIZE,		0, 1, GasPriceTier::Base);
-		arr[CODECOPY as usize] =		InstructionInfo::new("CODECOPY", CODECOPY,		3, 0, GasPriceTier::VeryLow);
-		arr[GASPRICE as usize] =		InstructionInfo::new("GASPRICE", GASPRICE,		0, 1, GasPriceTier::Base);
-		arr[EXTCODESIZE as usize] = 	InstructionInfo::new("EXTCODESIZE", EXTCODESIZE,		1, 1, GasPriceTier::Special);
-		arr[EXTCODECOPY as usize] = 	InstructionInfo::new("EXTCODECOPY", EXTCODECOPY,		4, 0, GasPriceTier::Special);
-		arr[BLOCKHASH as usize] =		InstructionInfo::new("BLOCKHASH", BLOCKHASH,		1, 1, GasPriceTier::Ext);
-		arr[COINBASE as usize] =		InstructionInfo::new("COINBASE", COINBASE,		0, 1, GasPriceTier::Base);
-		arr[TIMESTAMP as usize] =		InstructionInfo::new("TIMESTAMP", TIMESTAMP,		0, 1, GasPriceTier::Base);
-		arr[NUMBER as usize] =			InstructionInfo::new("NUMBER", NUMBER,			0, 1, GasPriceTier::Base);
-		arr[DIFFICULTY as usize] =		InstructionInfo::new("DIFFICULTY", DIFFICULTY,		0, 1, GasPriceTier::Base);
-		arr[GASLIMIT as usize] =		InstructionInfo::new("GASLIMIT", GASLIMIT,		0, 1, GasPriceTier::Base);
-		arr[POP as usize] = 			InstructionInfo::new("POP", POP,				1, 0, GasPriceTier::Base);
-		arr[MLOAD as usize] =			InstructionInfo::new("MLOAD", MLOAD,			1, 1, GasPriceTier::VeryLow);
-		arr[MSTORE as usize] =			InstructionInfo::new("MSTORE", MSTORE,			2, 0, GasPriceTier::VeryLow);
-		arr[MSTORE8 as usize] = 		InstructionInfo::new("MSTORE8", MSTORE8,			2, 0, GasPriceTier::VeryLow);
-		arr[SLOAD as usize] =			InstructionInfo::new("SLOAD", SLOAD,			1, 1, GasPriceTier::Special);
-		arr[SSTORE as usize] =			InstructionInfo::new("SSTORE", SSTORE,			2, 0, GasPriceTier::Special);
-		arr[JUMP as usize] =			InstructionInfo::new("JUMP", JUMP,			1, 0, GasPriceTier::Mid);
-		arr[JUMPI as usize] =			InstructionInfo::new("JUMPI", JUMPI,			2, 0, GasPriceTier::High);
-		arr[PC as usize] =				InstructionInfo::new("PC", PC,				0, 1, GasPriceTier::Base);
-		arr[MSIZE as usize] =			InstructionInfo::new("MSIZE", MSIZE,			0, 1, GasPriceTier::Base);
-		arr[GAS as usize] = 			InstructionInfo::new("GAS", GAS,				0, 1, GasPriceTier::Base);
-		arr[JUMPDEST as usize] =		InstructionInfo::new("JUMPDEST", JUMPDEST,		0, 0, GasPriceTier::Special);
-		arr[PUSH1 as usize] =			InstructionInfo::new("PUSH1", PUSH1,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH2 as usize] =			InstructionInfo::new("PUSH2", PUSH2,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH3 as usize] =			InstructionInfo::new("PUSH3", PUSH3,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH4 as usize] =			InstructionInfo::new("PUSH4", PUSH4,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH5 as usize] =			InstructionInfo::new("PUSH5", PUSH5,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH6 as usize] =			InstructionInfo::new("PUSH6", PUSH6,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH7 as usize] =			InstructionInfo::new("PUSH7", PUSH7,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH8 as usize] =			InstructionInfo::new("PUSH8", PUSH8,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH9 as usize] =			InstructionInfo::new("PUSH9", PUSH9,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH10 as usize] =			InstructionInfo::new("PUSH10", PUSH10,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH11 as usize] =			InstructionInfo::new("PUSH11", PUSH11,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH12 as usize] =			InstructionInfo::new("PUSH12", PUSH12,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH13 as usize] =			InstructionInfo::new("PUSH13", PUSH13,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH14 as usize] =			InstructionInfo::new("PUSH14", PUSH14,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH15 as usize] =			InstructionInfo::new("PUSH15", PUSH15,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH16 as usize] =			InstructionInfo::new("PUSH16", PUSH16,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH17 as usize] =			InstructionInfo::new("PUSH17", PUSH17,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH18 as usize] =			InstructionInfo::new("PUSH18", PUSH18,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH19 as usize] =			InstructionInfo::new("PUSH19", PUSH19,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH20 as usize] =			InstructionInfo::new("PUSH20", PUSH20,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH21 as usize] =			InstructionInfo::new("PUSH21", PUSH21,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH22 as usize] =			InstructionInfo::new("PUSH22", PUSH22,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH23 as usize] =			InstructionInfo::new("PUSH23", PUSH23,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH24 as usize] =			InstructionInfo::new("PUSH24", PUSH24,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH25 as usize] =			InstructionInfo::new("PUSH25", PUSH25,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH26 as usize] =			InstructionInfo::new("PUSH26", PUSH26,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH27 as usize] =			InstructionInfo::new("PUSH27", PUSH27,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH28 as usize] =			InstructionInfo::new("PUSH28", PUSH28,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH29 as usize] =			InstructionInfo::new("PUSH29", PUSH29,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH30 as usize] =			InstructionInfo::new("PUSH30", PUSH30,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH31 as usize] =			InstructionInfo::new("PUSH31", PUSH31,			0, 1, GasPriceTier::VeryLow);
-		arr[PUSH32 as usize] =			InstructionInfo::new("PUSH32", PUSH32,			0, 1, GasPriceTier::VeryLow);
-		arr[DUP1 as usize] =			InstructionInfo::new("DUP1", DUP1,			1, 2, GasPriceTier::VeryLow);
-		arr[DUP2 as usize] =			InstructionInfo::new("DUP2", DUP2,			2, 3, GasPriceTier::VeryLow);
-		arr[DUP3 as usize] =			InstructionInfo::new("DUP3", DUP3,			3, 4, GasPriceTier::VeryLow);
-		arr[DUP4 as usize] =			InstructionInfo::new("DUP4", DUP4,			4, 5, GasPriceTier::VeryLow);
-		arr[DUP5 as usize] =			InstructionInfo::new("DUP5", DUP5,			5, 6, GasPriceTier::VeryLow);
-		arr[DUP6 as usize] =			InstructionInfo::new("DUP6", DUP6,			6, 7, GasPriceTier::VeryLow);
-		arr[DUP7 as usize] =			InstructionInfo::new("DUP7", DUP7,			7, 8, GasPriceTier::VeryLow);
-		arr[DUP8 as usize] =			InstructionInfo::new("DUP8", DUP8,			8, 9, GasPriceTier::VeryLow);
-		arr[DUP9 as usize] =			InstructionInfo::new("DUP9", DUP9,			9, 10, GasPriceTier::VeryLow);
-		arr[DUP10 as usize] =			InstructionInfo::new("DUP10", DUP10,			10, 11, GasPriceTier::VeryLow);
-		arr[DUP11 as usize] =			InstructionInfo::new("DUP11", DUP11,			11, 12, GasPriceTier::VeryLow);
-		arr[DUP12 as usize] =			InstructionInfo::new("DUP12", DUP12,			12, 13, GasPriceTier::VeryLow);
-		arr[DUP13 as usize] =			InstructionInfo::new("DUP13", DUP13,			13, 14, GasPriceTier::VeryLow);
-		arr[DUP14 as usize] =			InstructionInfo::new("DUP14", DUP14,			14, 15, GasPriceTier::VeryLow);
-		arr[DUP15 as usize] =			InstructionInfo::new("DUP15", DUP15,			15, 16, GasPriceTier::VeryLow);
-		arr[DUP16 as usize] =			InstructionInfo::new("DUP16", DUP16,			16, 17, GasPriceTier::VeryLow);
-		arr[SWAP1 as usize] =			InstructionInfo::new("SWAP1", SWAP1,			2, 2, GasPriceTier::VeryLow);
-		arr[SWAP2 as usize] =			InstructionInfo::new("SWAP2", SWAP2,			3, 3, GasPriceTier::VeryLow);
-		arr[SWAP3 as usize] =			InstructionInfo::new("SWAP3", SWAP3,			4, 4, GasPriceTier::VeryLow);
-		arr[SWAP4 as usize] =			InstructionInfo::new("SWAP4", SWAP4,			5, 5, GasPriceTier::VeryLow);
-		arr[SWAP5 as usize] =			InstructionInfo::new("SWAP5", SWAP5,			6, 6, GasPriceTier::VeryLow);
-		arr[SWAP6 as usize] =			InstructionInfo::new("SWAP6", SWAP6,			7, 7, GasPriceTier::VeryLow);
-		arr[SWAP7 as usize] =			InstructionInfo::new("SWAP7", SWAP7,			8, 8, GasPriceTier::VeryLow);
-		arr[SWAP8 as usize] =			InstructionInfo::new("SWAP8", SWAP8,			9, 9, GasPriceTier::VeryLow);
-		arr[SWAP9 as usize] =			InstructionInfo::new("SWAP9", SWAP9,			10, 10, GasPriceTier::VeryLow);
-		arr[SWAP10 as usize] =			InstructionInfo::new("SWAP10", SWAP10,			11, 11, GasPriceTier::VeryLow);
-		arr[SWAP11 as usize] =			InstructionInfo::new("SWAP11", SWAP11,			12, 12, GasPriceTier::VeryLow);
-		arr[SWAP12 as usize] =			InstructionInfo::new("SWAP12", SWAP12,			13, 13, GasPriceTier::VeryLow);
-		arr[SWAP13 as usize] =			InstructionInfo::new("SWAP13", SWAP13,			14, 14, GasPriceTier::VeryLow);
-		arr[SWAP14 as usize] =			InstructionInfo::new("SWAP14", SWAP14,			15, 15, GasPriceTier::VeryLow);
-		arr[SWAP15 as usize] =			InstructionInfo::new("SWAP15", SWAP15,			16, 16, GasPriceTier::VeryLow);
-		arr[SWAP16 as usize] =			InstructionInfo::new("SWAP16", SWAP16,			17, 17, GasPriceTier::VeryLow);
-		arr[LOG0 as usize] =			InstructionInfo::new("LOG0", LOG0,			2, 0, GasPriceTier::Special);
-		arr[LOG1 as usize] =			InstructionInfo::new("LOG1", LOG1,			3, 0, GasPriceTier::Special);
-		arr[LOG2 as usize] =			InstructionInfo::new("LOG2", LOG2,			4, 0, GasPriceTier::Special);
-		arr[LOG3 as usize] =			InstructionInfo::new("LOG3", LOG3,			5, 0, GasPriceTier::Special);
-		arr[LOG4 as usize] =			InstructionInfo::new("LOG4", LOG4,			6, 0, GasPriceTier::Special);
-		arr[CREATE as usize] =			InstructionInfo::new("CREATE", CREATE,			3, 1, GasPriceTier::Special);
-		arr[CALL as usize] =			InstructionInfo::new("CALL", CALL,			7, 1, GasPriceTier::Special);
-		arr[CALLCODE as usize] =		InstructionInfo::new("CALLCODE", CALLCODE,		7, 1, GasPriceTier::Special);
-		arr[RETURN as usize] =			InstructionInfo::new("RETURN", RETURN,			2, 0, GasPriceTier::Zero);
-		arr[DELEGATECALL as usize] =	InstructionInfo::new("DELEGATECALL", DELEGATECALL,	6, 1, GasPriceTier::Special);
-		arr[STATICCALL as usize] =		InstructionInfo::new("STATICCALL", STATICCALL,		6, 1, GasPriceTier::Special);
-		arr[SUICIDE as usize] = 		InstructionInfo::new("SUICIDE", SUICIDE,			1, 0, GasPriceTier::Special);
-		arr[CREATE2 as usize] = 		InstructionInfo::new("CREATE2", CREATE2,			3, 1, GasPriceTier::Special);
-		arr[REVERT as usize] =			InstructionInfo::new("REVERT", REVERT,			2, 0, GasPriceTier::Zero);
+		arr[STOP as usize] =			OpCodeInfo::new("STOP", STOP,			0, 0, GasPriceTier::Zero);
+		arr[ADD as usize] = 			OpCodeInfo::new("ADD", ADD,				2, 1, GasPriceTier::VeryLow);
+		arr[SUB as usize] = 			OpCodeInfo::new("SUB", SUB,				2, 1, GasPriceTier::VeryLow);
+		arr[MUL as usize] = 			OpCodeInfo::new("MUL", MUL,				2, 1, GasPriceTier::Low);
+		arr[DIV as usize] = 			OpCodeInfo::new("DIV", DIV,				2, 1, GasPriceTier::Low);
+		arr[SDIV as usize] =			OpCodeInfo::new("SDIV", SDIV,			2, 1, GasPriceTier::Low);
+		arr[MOD as usize] = 			OpCodeInfo::new("MOD", MOD,				2, 1, GasPriceTier::Low);
+		arr[SMOD as usize] =			OpCodeInfo::new("SMOD", SMOD,			2, 1, GasPriceTier::Low);
+		arr[EXP as usize] = 			OpCodeInfo::new("EXP", EXP,				2, 1, GasPriceTier::Special);
+		arr[NOT as usize] = 			OpCodeInfo::new("NOT", NOT,				1, 1, GasPriceTier::VeryLow);
+		arr[LT as usize] =				OpCodeInfo::new("LT", LT,				2, 1, GasPriceTier::VeryLow);
+		arr[GT as usize] =				OpCodeInfo::new("GT", GT,				2, 1, GasPriceTier::VeryLow);
+		arr[SLT as usize] = 			OpCodeInfo::new("SLT", SLT,				2, 1, GasPriceTier::VeryLow);
+		arr[SGT as usize] = 			OpCodeInfo::new("SGT", SGT,				2, 1, GasPriceTier::VeryLow);
+		arr[EQ as usize] =				OpCodeInfo::new("EQ", EQ,				2, 1, GasPriceTier::VeryLow);
+		arr[ISZERO as usize] =			OpCodeInfo::new("ISZERO", ISZERO,			1, 1, GasPriceTier::VeryLow);
+		arr[AND as usize] = 			OpCodeInfo::new("AND", AND,				2, 1, GasPriceTier::VeryLow);
+		arr[OR as usize] =				OpCodeInfo::new("OR", OR,				2, 1, GasPriceTier::VeryLow);
+		arr[XOR as usize] = 			OpCodeInfo::new("XOR", XOR,				2, 1, GasPriceTier::VeryLow);
+		arr[BYTE as usize] =			OpCodeInfo::new("BYTE", BYTE,			2, 1, GasPriceTier::VeryLow);
+		arr[ADDMOD as usize] =			OpCodeInfo::new("ADDMOD", ADDMOD,			3, 1, GasPriceTier::Mid);
+		arr[MULMOD as usize] =			OpCodeInfo::new("MULMOD", MULMOD,			3, 1, GasPriceTier::Mid);
+		arr[SIGNEXTEND as usize] =		OpCodeInfo::new("SIGNEXTEND", SIGNEXTEND,		2, 1, GasPriceTier::Low);
+		arr[RETURNDATASIZE as usize] =	OpCodeInfo::new("RETURNDATASIZE", RETURNDATASIZE,	0, 1, GasPriceTier::Base);
+		arr[RETURNDATACOPY as usize] =	OpCodeInfo::new("RETURNDATACOPY", RETURNDATACOPY,	3, 0, GasPriceTier::VeryLow);
+		arr[SHA3 as usize] =			OpCodeInfo::new("SHA3", SHA3,			2, 1, GasPriceTier::Special);
+		arr[ADDRESS as usize] = 		OpCodeInfo::new("ADDRESS", ADDRESS,			0, 1, GasPriceTier::Base);
+		arr[BALANCE as usize] = 		OpCodeInfo::new("BALANCE", BALANCE,			1, 1, GasPriceTier::Special);
+		arr[ORIGIN as usize] =			OpCodeInfo::new("ORIGIN", ORIGIN,			0, 1, GasPriceTier::Base);
+		arr[CALLER as usize] =			OpCodeInfo::new("CALLER", CALLER,			0, 1, GasPriceTier::Base);
+		arr[CALLVALUE as usize] =		OpCodeInfo::new("CALLVALUE", CALLVALUE,		0, 1, GasPriceTier::Base);
+		arr[CALLDATALOAD as usize] =	OpCodeInfo::new("CALLDATALOAD", CALLDATALOAD,	1, 1, GasPriceTier::VeryLow);
+		arr[CALLDATASIZE as usize] =	OpCodeInfo::new("CALLDATASIZE", CALLDATASIZE,	0, 1, GasPriceTier::Base);
+		arr[CALLDATACOPY as usize] =	OpCodeInfo::new("CALLDATACOPY", CALLDATACOPY,	3, 0, GasPriceTier::VeryLow);
+		arr[CODESIZE as usize] =		OpCodeInfo::new("CODESIZE", CODESIZE,		0, 1, GasPriceTier::Base);
+		arr[CODECOPY as usize] =		OpCodeInfo::new("CODECOPY", CODECOPY,		3, 0, GasPriceTier::VeryLow);
+		arr[GASPRICE as usize] =		OpCodeInfo::new("GASPRICE", GASPRICE,		0, 1, GasPriceTier::Base);
+		arr[EXTCODESIZE as usize] = 	OpCodeInfo::new("EXTCODESIZE", EXTCODESIZE,		1, 1, GasPriceTier::Special);
+		arr[EXTCODECOPY as usize] = 	OpCodeInfo::new("EXTCODECOPY", EXTCODECOPY,		4, 0, GasPriceTier::Special);
+		arr[BLOCKHASH as usize] =		OpCodeInfo::new("BLOCKHASH", BLOCKHASH,		1, 1, GasPriceTier::Ext);
+		arr[COINBASE as usize] =		OpCodeInfo::new("COINBASE", COINBASE,		0, 1, GasPriceTier::Base);
+		arr[TIMESTAMP as usize] =		OpCodeInfo::new("TIMESTAMP", TIMESTAMP,		0, 1, GasPriceTier::Base);
+		arr[NUMBER as usize] =			OpCodeInfo::new("NUMBER", NUMBER,			0, 1, GasPriceTier::Base);
+		arr[DIFFICULTY as usize] =		OpCodeInfo::new("DIFFICULTY", DIFFICULTY,		0, 1, GasPriceTier::Base);
+		arr[GASLIMIT as usize] =		OpCodeInfo::new("GASLIMIT", GASLIMIT,		0, 1, GasPriceTier::Base);
+		arr[POP as usize] = 			OpCodeInfo::new("POP", POP,				1, 0, GasPriceTier::Base);
+		arr[MLOAD as usize] =			OpCodeInfo::new("MLOAD", MLOAD,			1, 1, GasPriceTier::VeryLow);
+		arr[MSTORE as usize] =			OpCodeInfo::new("MSTORE", MSTORE,			2, 0, GasPriceTier::VeryLow);
+		arr[MSTORE8 as usize] = 		OpCodeInfo::new("MSTORE8", MSTORE8,			2, 0, GasPriceTier::VeryLow);
+		arr[SLOAD as usize] =			OpCodeInfo::new("SLOAD", SLOAD,			1, 1, GasPriceTier::Special);
+		arr[SSTORE as usize] =			OpCodeInfo::new("SSTORE", SSTORE,			2, 0, GasPriceTier::Special);
+		arr[JUMP as usize] =			OpCodeInfo::new("JUMP", JUMP,			1, 0, GasPriceTier::Mid);
+		arr[JUMPI as usize] =			OpCodeInfo::new("JUMPI", JUMPI,			2, 0, GasPriceTier::High);
+		arr[PC as usize] =				OpCodeInfo::new("PC", PC,				0, 1, GasPriceTier::Base);
+		arr[MSIZE as usize] =			OpCodeInfo::new("MSIZE", MSIZE,			0, 1, GasPriceTier::Base);
+		arr[GAS as usize] = 			OpCodeInfo::new("GAS", GAS,				0, 1, GasPriceTier::Base);
+		arr[JUMPDEST as usize] =		OpCodeInfo::new("JUMPDEST", JUMPDEST,		0, 0, GasPriceTier::Special);
+		arr[PUSH1 as usize] =			OpCodeInfo::new("PUSH1", PUSH1,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH2 as usize] =			OpCodeInfo::new("PUSH2", PUSH2,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH3 as usize] =			OpCodeInfo::new("PUSH3", PUSH3,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH4 as usize] =			OpCodeInfo::new("PUSH4", PUSH4,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH5 as usize] =			OpCodeInfo::new("PUSH5", PUSH5,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH6 as usize] =			OpCodeInfo::new("PUSH6", PUSH6,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH7 as usize] =			OpCodeInfo::new("PUSH7", PUSH7,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH8 as usize] =			OpCodeInfo::new("PUSH8", PUSH8,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH9 as usize] =			OpCodeInfo::new("PUSH9", PUSH9,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH10 as usize] =			OpCodeInfo::new("PUSH10", PUSH10,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH11 as usize] =			OpCodeInfo::new("PUSH11", PUSH11,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH12 as usize] =			OpCodeInfo::new("PUSH12", PUSH12,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH13 as usize] =			OpCodeInfo::new("PUSH13", PUSH13,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH14 as usize] =			OpCodeInfo::new("PUSH14", PUSH14,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH15 as usize] =			OpCodeInfo::new("PUSH15", PUSH15,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH16 as usize] =			OpCodeInfo::new("PUSH16", PUSH16,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH17 as usize] =			OpCodeInfo::new("PUSH17", PUSH17,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH18 as usize] =			OpCodeInfo::new("PUSH18", PUSH18,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH19 as usize] =			OpCodeInfo::new("PUSH19", PUSH19,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH20 as usize] =			OpCodeInfo::new("PUSH20", PUSH20,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH21 as usize] =			OpCodeInfo::new("PUSH21", PUSH21,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH22 as usize] =			OpCodeInfo::new("PUSH22", PUSH22,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH23 as usize] =			OpCodeInfo::new("PUSH23", PUSH23,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH24 as usize] =			OpCodeInfo::new("PUSH24", PUSH24,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH25 as usize] =			OpCodeInfo::new("PUSH25", PUSH25,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH26 as usize] =			OpCodeInfo::new("PUSH26", PUSH26,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH27 as usize] =			OpCodeInfo::new("PUSH27", PUSH27,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH28 as usize] =			OpCodeInfo::new("PUSH28", PUSH28,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH29 as usize] =			OpCodeInfo::new("PUSH29", PUSH29,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH30 as usize] =			OpCodeInfo::new("PUSH30", PUSH30,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH31 as usize] =			OpCodeInfo::new("PUSH31", PUSH31,			0, 1, GasPriceTier::VeryLow);
+		arr[PUSH32 as usize] =			OpCodeInfo::new("PUSH32", PUSH32,			0, 1, GasPriceTier::VeryLow);
+		arr[DUP1 as usize] =			OpCodeInfo::new("DUP1", DUP1,			1, 2, GasPriceTier::VeryLow);
+		arr[DUP2 as usize] =			OpCodeInfo::new("DUP2", DUP2,			2, 3, GasPriceTier::VeryLow);
+		arr[DUP3 as usize] =			OpCodeInfo::new("DUP3", DUP3,			3, 4, GasPriceTier::VeryLow);
+		arr[DUP4 as usize] =			OpCodeInfo::new("DUP4", DUP4,			4, 5, GasPriceTier::VeryLow);
+		arr[DUP5 as usize] =			OpCodeInfo::new("DUP5", DUP5,			5, 6, GasPriceTier::VeryLow);
+		arr[DUP6 as usize] =			OpCodeInfo::new("DUP6", DUP6,			6, 7, GasPriceTier::VeryLow);
+		arr[DUP7 as usize] =			OpCodeInfo::new("DUP7", DUP7,			7, 8, GasPriceTier::VeryLow);
+		arr[DUP8 as usize] =			OpCodeInfo::new("DUP8", DUP8,			8, 9, GasPriceTier::VeryLow);
+		arr[DUP9 as usize] =			OpCodeInfo::new("DUP9", DUP9,			9, 10, GasPriceTier::VeryLow);
+		arr[DUP10 as usize] =			OpCodeInfo::new("DUP10", DUP10,			10, 11, GasPriceTier::VeryLow);
+		arr[DUP11 as usize] =			OpCodeInfo::new("DUP11", DUP11,			11, 12, GasPriceTier::VeryLow);
+		arr[DUP12 as usize] =			OpCodeInfo::new("DUP12", DUP12,			12, 13, GasPriceTier::VeryLow);
+		arr[DUP13 as usize] =			OpCodeInfo::new("DUP13", DUP13,			13, 14, GasPriceTier::VeryLow);
+		arr[DUP14 as usize] =			OpCodeInfo::new("DUP14", DUP14,			14, 15, GasPriceTier::VeryLow);
+		arr[DUP15 as usize] =			OpCodeInfo::new("DUP15", DUP15,			15, 16, GasPriceTier::VeryLow);
+		arr[DUP16 as usize] =			OpCodeInfo::new("DUP16", DUP16,			16, 17, GasPriceTier::VeryLow);
+		arr[SWAP1 as usize] =			OpCodeInfo::new("SWAP1", SWAP1,			2, 2, GasPriceTier::VeryLow);
+		arr[SWAP2 as usize] =			OpCodeInfo::new("SWAP2", SWAP2,			3, 3, GasPriceTier::VeryLow);
+		arr[SWAP3 as usize] =			OpCodeInfo::new("SWAP3", SWAP3,			4, 4, GasPriceTier::VeryLow);
+		arr[SWAP4 as usize] =			OpCodeInfo::new("SWAP4", SWAP4,			5, 5, GasPriceTier::VeryLow);
+		arr[SWAP5 as usize] =			OpCodeInfo::new("SWAP5", SWAP5,			6, 6, GasPriceTier::VeryLow);
+		arr[SWAP6 as usize] =			OpCodeInfo::new("SWAP6", SWAP6,			7, 7, GasPriceTier::VeryLow);
+		arr[SWAP7 as usize] =			OpCodeInfo::new("SWAP7", SWAP7,			8, 8, GasPriceTier::VeryLow);
+		arr[SWAP8 as usize] =			OpCodeInfo::new("SWAP8", SWAP8,			9, 9, GasPriceTier::VeryLow);
+		arr[SWAP9 as usize] =			OpCodeInfo::new("SWAP9", SWAP9,			10, 10, GasPriceTier::VeryLow);
+		arr[SWAP10 as usize] =			OpCodeInfo::new("SWAP10", SWAP10,			11, 11, GasPriceTier::VeryLow);
+		arr[SWAP11 as usize] =			OpCodeInfo::new("SWAP11", SWAP11,			12, 12, GasPriceTier::VeryLow);
+		arr[SWAP12 as usize] =			OpCodeInfo::new("SWAP12", SWAP12,			13, 13, GasPriceTier::VeryLow);
+		arr[SWAP13 as usize] =			OpCodeInfo::new("SWAP13", SWAP13,			14, 14, GasPriceTier::VeryLow);
+		arr[SWAP14 as usize] =			OpCodeInfo::new("SWAP14", SWAP14,			15, 15, GasPriceTier::VeryLow);
+		arr[SWAP15 as usize] =			OpCodeInfo::new("SWAP15", SWAP15,			16, 16, GasPriceTier::VeryLow);
+		arr[SWAP16 as usize] =			OpCodeInfo::new("SWAP16", SWAP16,			17, 17, GasPriceTier::VeryLow);
+		arr[LOG0 as usize] =			OpCodeInfo::new("LOG0", LOG0,			2, 0, GasPriceTier::Special);
+		arr[LOG1 as usize] =			OpCodeInfo::new("LOG1", LOG1,			3, 0, GasPriceTier::Special);
+		arr[LOG2 as usize] =			OpCodeInfo::new("LOG2", LOG2,			4, 0, GasPriceTier::Special);
+		arr[LOG3 as usize] =			OpCodeInfo::new("LOG3", LOG3,			5, 0, GasPriceTier::Special);
+		arr[LOG4 as usize] =			OpCodeInfo::new("LOG4", LOG4,			6, 0, GasPriceTier::Special);
+		arr[CREATE as usize] =			OpCodeInfo::new("CREATE", CREATE,			3, 1, GasPriceTier::Special);
+		arr[CALL as usize] =			OpCodeInfo::new("CALL", CALL,			7, 1, GasPriceTier::Special);
+		arr[CALLCODE as usize] =		OpCodeInfo::new("CALLCODE", CALLCODE,		7, 1, GasPriceTier::Special);
+		arr[RETURN as usize] =			OpCodeInfo::new("RETURN", RETURN,			2, 0, GasPriceTier::Zero);
+		arr[DELEGATECALL as usize] =	OpCodeInfo::new("DELEGATECALL", DELEGATECALL,	6, 1, GasPriceTier::Special);
+		arr[STATICCALL as usize] =		OpCodeInfo::new("STATICCALL", STATICCALL,		6, 1, GasPriceTier::Special);
+		arr[SUICIDE as usize] = 		OpCodeInfo::new("SUICIDE", SUICIDE,			1, 0, GasPriceTier::Special);
+		arr[CREATE2 as usize] = 		OpCodeInfo::new("CREATE2", CREATE2,			3, 1, GasPriceTier::Special);
+		arr[REVERT as usize] =			OpCodeInfo::new("REVERT", REVERT,			2, 0, GasPriceTier::Zero);
 		arr
 	};
 }
