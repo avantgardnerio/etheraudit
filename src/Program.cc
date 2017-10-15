@@ -19,7 +19,7 @@ static void printOpCode(const uint8_t* data, size_t pos, const OpCodes::OpCode& 
 
 
 void Program::fillInstructions() {
-    std::vector<CFStackEntry> stack;
+    std::vector<CFExpression> stack;
     size_t globalIdx = 0;
     size_t* jumpIdx = 0;
     OpCodes::iterate(byteCode, [&](const uint8_t* data, size_t pos, const OpCodes::OpCode& opCode){
@@ -38,7 +38,7 @@ void Program::fillInstructions() {
         auto stackBack = stack.end();
         for(size_t i = 0;i <opCode.stackRemoved;i++) {
             if(stack.size() == 0) {
-                CFStackEntry entry;
+                CFExpression entry;
                 entry.label = "argument";
                 if(jumpIdx)
                     entry.idx = (*jumpIdx)++;
@@ -53,7 +53,7 @@ void Program::fillInstructions() {
         }
 
         for(size_t i = 0;i < opCode.stackAdded;i++) {
-            CFStackEntry entry;
+            CFExpression entry;
             entry.idx = globalIdx++;
             if(opCode.opCode >= OpCodes::PUSH1.opCode &&
                opCode.opCode <= OpCodes::PUSH32.opCode) {
@@ -197,7 +197,7 @@ void Program::solveStack(size_t& globalIdx,
             auto stackBack = stack.end();
             for (size_t i = 0; i < opCode.stackRemoved; i++) {
                 if(stack.size() == 0) {
-                    CFStackEntry entry;
+                    CFExpression entry;
                     entry.label = "argument";
                     entry.idx = argumentIdx++;
                     stack.push_back(entry);
@@ -208,7 +208,7 @@ void Program::solveStack(size_t& globalIdx,
             }
 
             for (size_t i = 0; i < opCode.stackAdded; i++) {
-                CFStackEntry entry;
+                CFExpression entry;
                 entry.idx = globalIdx++;
                 if (opCode.opCode >= OpCodes::PUSH1.opCode &&
                     opCode.opCode <= OpCodes::PUSH32.opCode) {

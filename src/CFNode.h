@@ -7,7 +7,7 @@
 #include <map>
 #include <set>
 #include <unordered_set>
-#include "CFStackEntry.h"
+#include "CFExpression.h"
 #include "Program.h"
 
 class CFInstruction;
@@ -37,9 +37,9 @@ public:
     std::shared_ptr<CFInstruction> lastInstruction(const Program& p) const;
 
     bool HasPossibleEntryStackStates() const;
-    std::map<std::vector<CFStackEntry>, std::vector<std::vector<size_t>> > possibleEntryStackStates;
+    std::map<std::vector<CFExpression>, std::vector<std::vector<size_t>> > possibleEntryStackStates;
 
     bool HasPossibleExitStackStates() const;
-    std::map<std::vector<CFStackEntry>, std::vector<std::vector<size_t>> > possibleExitStackStates;
+    std::map<std::vector<CFExpression>, std::vector<std::vector<size_t>> > possibleExitStackStates;
 };
 

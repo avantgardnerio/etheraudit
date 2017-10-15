@@ -3,17 +3,17 @@
 #include "Program.h"
 #include <iostream>
 #include <set>
-#include "CFStackEntry.h"
+#include "CFExpression.h"
 #include "Utils.h"
 
-bool CFStackEntry::getConstantInt(int64_t *v) {
+bool CFExpression::getConstantInt(int64_t *v) {
     if(!isConstant)
         return false;
 
     return getInt64FromVec(constantValue, v);
 }
 
-std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry) {
+std::ostream &operator<<(std::ostream &os, const CFExpression &entry) {
     if(entry.isConstant) {
         os << "{" << toString(entry.constantValue) << "}";
     } else {
@@ -28,18 +28,18 @@ std::ostream &operator<<(std::ostream &os, const CFStackEntry &entry) {
     return os;
 }
 
-bool CFStackEntry::operator==(const CFStackEntry &rhs) const {
+bool CFExpression::operator==(const CFExpression &rhs) const {
     return idx == rhs.idx &&
            label == rhs.label &&
            isConstant == rhs.isConstant &&
            constantValue == rhs.constantValue;
 }
 
-bool CFStackEntry::operator!=(const CFStackEntry &rhs) const {
+bool CFExpression::operator!=(const CFExpression &rhs) const {
     return !(rhs == *this);
 }
 
-bool CFStackEntry::operator<(const CFStackEntry &rhs) const {
+bool CFExpression::operator<(const CFExpression &rhs) const {
     if (idx < rhs.idx)
         return true;
     if (rhs.idx < idx)
@@ -55,19 +55,19 @@ bool CFStackEntry::operator<(const CFStackEntry &rhs) const {
     return constantValue < rhs.constantValue;
 }
 
-bool CFStackEntry::operator>(const CFStackEntry &rhs) const {
+bool CFExpression::operator>(const CFExpression &rhs) const {
     return rhs < *this;
 }
 
-bool CFStackEntry::operator<=(const CFStackEntry &rhs) const {
+bool CFExpression::operator<=(const CFExpression &rhs) const {
     return !(rhs < *this);
 }
 
-bool CFStackEntry::operator>=(const CFStackEntry &rhs) const {
+bool CFExpression::operator>=(const CFExpression &rhs) const {
     return !(*this < rhs);
 }
 
-bool CFStackEntry::isSymbol() const {
+bool CFExpression::isSymbolic() const {
     if(isConstant)
         return false;
     if(!label.empty())

@@ -9,7 +9,7 @@
 #include <map>
 #include <set>
 #include "OpCodes.h"
-#include "CFStackEntry.h"
+#include "CFExpression.h"
 #include "CFNode.h"
 
 struct CFInstruction;
@@ -21,8 +21,8 @@ struct CFInstruction {
 
     CFInstruction(const Program &program, size_t offset, const OpCodes::OpCode &opCode, const std::vector<uint8_t> &data = {});
 
-    std::vector<CFStackEntry> operands;
-    std::vector<CFStackEntry> outputs;
+    std::vector<CFExpression> operands;
+    std::vector<CFExpression> outputs;
 
     bool allOutputsSingleUse() const;
     bool allOperandsConstant() const;

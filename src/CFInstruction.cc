@@ -51,7 +51,7 @@ bool CFInstruction::allOutputsSingleUse() const {
         return false;
     
     for(auto& op : outputs) {
-        if(op.isSymbol()) {
+        if(op.isSymbolic()) {
             auto it = program.Symbols().find(op.idx);
             assert(it != program.Symbols().end());
             if(it != program.Symbols().end() && it->second.usedAt.size() > 1) {

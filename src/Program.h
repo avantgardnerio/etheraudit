@@ -9,13 +9,13 @@
 #include <ostream>
 #include <fstream>
 
-#include "CFStackEntry.h"
+#include "CFExpression.h"
 #include "CFNode.h"
 #include "CFInstruction.h"
 
 struct Program;
 
-typedef std::vector<CFStackEntry> CFStack;
+typedef std::vector<CFExpression> CFStack;
 typedef std::vector<size_t> executionPath;
 class CFNode;
 class CFInstruction;
@@ -41,8 +41,8 @@ struct AnalysisIssue {
 };
 
 struct CFSymbolInfo {
-    size_t idx;
-    size_t createdAt;
+    size_t idx = 0;
+    size_t createdAt = 0;
     std::set<size_t> usedAt;
 
     std::string ToString(const Program& p) const;
