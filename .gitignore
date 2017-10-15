@@ -20,3 +20,11 @@ cmake-build-debug
 # BC files
 *.bc
 md5-*
+
+# Rust specific files
+**/target/debug
+**/target/release
+**/*.rs.bk
+
+# Cache files
+*~

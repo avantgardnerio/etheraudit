@@ -1,0 +1,12 @@
+[package]
+name = "etheraudit"
+version = "0.1.0"
+authors = ["Justin Berger <j.david.berger@gmail.com>"]
+
+[dependencies]
+ethcore          = { git = "https://github.com/paritytech/parity" }
+evm          = { git = "https://github.com/paritytech/parity" }
+ethcore-devtools = { git = "https://github.com/paritytech/parity" }
+ethcore-io       = { git = "https://github.com/paritytech/parity" }
+ethcore-util     = { git = "https://github.com/paritytech/parity" }
+ethkey           = { git = "https://github.com/paritytech/parity" }
