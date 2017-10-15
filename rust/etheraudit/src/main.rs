@@ -2,12 +2,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-extern crate ethcore;
-extern crate ethcore_devtools;
-extern crate ethcore_io;
-extern crate ethcore_util;
-extern crate ethkey;
-
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -19,7 +13,7 @@ mod program;
 
 use program::*;
 
-fn parse_byte_code(str: &String) -> ByteCode {
+fn parse_byte_code(str: &str) -> ByteCode {
     let mut byte_code: ByteCode = std::vec::Vec::new();
 
     for idx in (0..str.len()).step_by(2) {
@@ -31,7 +25,7 @@ fn parse_byte_code(str: &String) -> ByteCode {
     byte_code
 }
 
-fn read_file(file_name: &String) -> Program {
+fn read_file(file_name: &str) -> Program {
     println!("{}", file_name);
 
     let mut f = File::open(&file_name).expect("file not found");
@@ -46,13 +40,11 @@ fn read_file(file_name: &String) -> Program {
 }
 
 fn process_program(p: &Program) {
-    for (_, block) in &p.blocks {
+    for block in p.blocks.values() {
         println!("Block {} {}", block.start, block.end);
         for pos in block.start..block.end {
-            match p.instructions.get(&pos) {
-                Some(instr) => {
+            if let Some(instr) = p.instructions.get(&pos) {
                     println!("{}\t{} {:?}", pos, op_codes::OPCODES[instr.op_code as usize].name, instr.data);
-                }, None => {}
             }
         }
         println!();

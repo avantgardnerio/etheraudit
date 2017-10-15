@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate arrayvec;
 
 use self::arrayvec::ArrayVec;
@@ -10,13 +12,11 @@ pub fn is_push(i: Instruction) -> bool {
 }
 
 pub fn is_stop(op_code: u8) -> bool {
-	return op_code == STOP ||
-		op_code == RETURN;
+	op_code == STOP || op_code == RETURN
 }
 
 pub fn is_jump(op_code: u8) -> bool {
-	return op_code == JUMP ||
-		op_code == JUMPI;
+	op_code == JUMP || op_code == JUMPI
 }
 
 #[test]
