@@ -10,6 +10,8 @@ mod op_codes;
 mod instruction;
 mod block;
 mod program;
+mod expression;
+use std::rc::Rc;
 
 use program::*;
 
@@ -44,7 +46,11 @@ fn process_program(p: &Program) {
         println!("Block {} {}", block.start, block.end);
         for pos in block.start..block.end {
             if let Some(instr) = p.instructions.get(&pos) {
-                    println!("{}\t{} {:?}", pos, op_codes::OPCODES[instr.op_code as usize].name, instr.data);
+                if true || !op_codes::is_stack_manip_only(instr.op_code) {
+                    println!("{}\t{:?} := {}({:?})", pos,
+                             instr.outputs, op_codes::OPCODES[instr.op_code as usize].name,
+                             instr.inputs);
+                }
             }
         }
         println!();

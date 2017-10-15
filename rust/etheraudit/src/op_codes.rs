@@ -15,6 +15,16 @@ pub fn is_stop(op_code: u8) -> bool {
 	op_code == STOP || op_code == RETURN
 }
 
+pub fn is_stack_manip_only(op_code: Instruction) -> bool {
+	match op_code {
+		DUP1 ... DUP16 => true,
+		SWAP1 ... SWAP16 => true,
+		PUSH1 ... PUSH32 => true,
+		POP => true,
+		_ => false
+	}
+}
+
 pub fn is_jump(op_code: u8) -> bool {
 	op_code == JUMP || op_code == JUMPI
 }
