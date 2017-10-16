@@ -1,7 +1,8 @@
 #![feature(iterator_step_by)]
+#![feature(slice_patterns)]
 #[macro_use]
 extern crate lazy_static;
-
+extern crate num;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -14,6 +15,8 @@ mod expression;
 use std::rc::Rc;
 
 use program::*;
+use num::bigint::BigInt;
+use num::Zero;
 
 fn parse_byte_code(str: &str) -> ByteCode {
     let mut byte_code: ByteCode = std::vec::Vec::new();
@@ -46,14 +49,24 @@ fn process_program(p: &Program) {
         println!("Block {} {}", block.start, block.end);
         for pos in block.start..block.end {
             if let Some(instr) = p.instructions.get(&pos) {
-                if true || !op_codes::is_stack_manip_only(instr.op_code) {
+                if !op_codes::is_stack_manip_only(instr.op_code) {
                     println!("{}\t{:?} := {}({:?})", pos,
                              instr.outputs, op_codes::OPCODES[instr.op_code as usize].name,
                              instr.inputs);
                 }
             }
         }
+
         println!();
+    }
+
+    use expression::OpTree;
+    let assert_query = OpTree::Operation(op_codes::JUMPI, vec![
+        OpTree::Constant(BigInt::from(2)), OpTree::Query("condition".to_string())
+    ]);
+
+    for r in p.query(&assert_query) {
+        println!("{:?}", r);
     }
 }
 

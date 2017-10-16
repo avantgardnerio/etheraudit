@@ -7,51 +7,22 @@ use block::*;
 use op_codes;
 use std::rc::Rc;
 
-
 pub type ByteCode = std::vec::Vec<u8>;
 pub type EvmStack = std::vec::Vec< Rc<expression::Expression> >;
 
 pub struct Program {
     pub byte_code: ByteCode,
     pub instructions: BTreeMap<usize, Instruction >,
-    pub blocks: BTreeMap<usize, Block>
+    pub blocks: BTreeMap<usize, Block>,
+    pub op_trees: BTreeMap<usize, expression::OpTree>
 }
 
 impl Program {
-    fn fill_expressions(self: &mut Program) {
-        for block in self.blocks.values() {
-            let mut stack : std::vec::Vec< Rc<expression::Expression> > = std::vec::Vec::new();
-            let mut arg = 0;
-            for pos in block.start..block.end {
-                if let Some(instr) = self.instructions.get_mut(&pos) {
-                    let op_info: &op_codes::OpCodeInfo = &op_codes::OPCODES[instr.op_code as usize];
-                    for i in 0..op_info.args {
-                        let entry = match stack.pop() {
-                            Some(e) => e,
-                            None => {
-                                arg += 1;
-                                Rc::new( expression::Expression::Argument(arg-1))
-                            }
-                        };
-
-                        instr.inputs.push(entry);
-                    }
-
-                    for i in 0..op_info.ret {
-
-                    }
-
-                    if !instr.data.is_empty() {
-                        let expr = Rc::new(expression::make_constant(&instr.data));
-                        instr.inputs.push(Rc::clone(&expr));
-                        stack.push( expr);
-                    }
-
-                }
-            }
-        }
+    pub fn query(self: &Program,query: &expression::OpTree) -> std::vec::Vec< (usize, expression::QueryResult) > {
+        self.op_trees.iter().filter_map(|(pos, tree)| {
+            tree.query(query).map(|ans| (*pos, ans))
+        }).collect()
     }
-
     pub fn fill_instructions(self: &mut Program) {
         let mut stack = EvmStack::new();
         let mut start = 0;
@@ -83,6 +54,8 @@ impl Program {
                 this_end = None;
             }
 
+            let new_tree = expression::OpTree::create_from_instr(&self, &instr);
+            self.op_trees.insert(instr.offset, new_tree);
             self.instructions.insert(instr.offset, instr);
         }
     }
@@ -91,7 +64,8 @@ impl Program {
         let mut rtn = Program {
             byte_code,
             instructions: BTreeMap::new(),
-            blocks: BTreeMap::new()
+            blocks: BTreeMap::new(),
+            op_trees: BTreeMap::new()
         };
 
         rtn.fill_instructions();
