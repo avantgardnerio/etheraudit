@@ -2,7 +2,13 @@
 
 extern crate arrayvec;
 
+use num;
+use num::Zero;
+
+use std;
+use num::ToPrimitive;
 use self::arrayvec::ArrayVec;
+use num::bigint::ToBigInt;
 
 pub type Instruction = u8;
 
@@ -318,6 +324,86 @@ lazy_static! {
 	};
 }
 
+pub fn get_infix(op_code: Instruction) -> Option<&'static str> {
+	match op_code {
+		EXP =>  Some("**"),
+		DIV =>  Some("/"),
+		NOT =>  Some("!"),
+		ISZERO =>  Some("0 == "),
+		SUB =>  Some("-"),
+		OR =>  Some("||"),
+		AND =>  Some("&"),
+		ADD =>  Some("+"),
+		GT =>  Some(">"),
+		LT =>  Some("<"),
+		XOR =>  Some("^"),
+		MUL =>  Some("*"),
+		MOD =>  Some("%"),
+		EQ =>  Some("=="),
+		SDIV =>  Some("//"),
+		_ => None
+	}
+}
+
+pub fn is_arithmetic(op_code: Instruction) -> bool {
+	match op_code {
+		EXP => true,
+		DIV => true,
+		NOT => true,
+		ISZERO => true,
+		SUB => true,
+		OR => true,
+		AND => true,
+		ADD => true,
+		GT => true,
+		LT => true,
+		XOR => true,
+		MUL => true,
+		MOD => true,
+		EQ => true,
+		SDIV => true,
+		_ => false
+	}
+}
+fn negate(v: num::BigUint) -> num::BigUint {
+	let bytes : std::vec::Vec<u8> = v.to_bytes_be().iter().map(std::ops::Not::not).collect();
+	num::BigUint::from_bytes_be(&bytes)
+}
+
+pub fn solve(opcode: Instruction,input: &std::vec::Vec<num::BigInt>) -> num::BigInt {
+	assert!(is_arithmetic(opcode));
+	assert_eq!(OPCODES[opcode as usize].args, input.len());
+
+	match opcode {
+		EXP => num::pow(input[0].clone(), input[1].to_usize().unwrap()),
+		DIV => {
+			if input[1].clone() == num::BigInt::zero() {
+				num::BigInt::zero()
+			} else {
+				input[0].clone() / input[1].clone()
+			}
+		},
+		NOT => (negate(input[0].to_biguint().unwrap())).to_bigint().unwrap(),
+		ISZERO => num::BigInt::from( (input[0].clone() == num::BigInt::zero()) as usize ),
+		SUB =>input[0].clone() - input[1].clone(),
+		AND =>(input[0].clone().to_biguint().unwrap() & input[1].clone().to_biguint().unwrap()).to_bigint().unwrap(),
+		ADD =>input[0].clone() + input[1].clone(),
+		GT => num::BigInt::from( (input[0].clone() > input[1].clone()) as usize ),
+		LT => num::BigInt::from( (input[0].clone() > input[1].clone()) as usize ),
+		XOR =>(input[0].clone().to_biguint().unwrap() ^ input[1].clone().to_biguint().unwrap()).to_bigint().unwrap(),
+		MUL =>input[0].clone() * input[1].clone(),
+		MOD =>input[0].clone() % input[1].clone(),
+		EQ => num::BigInt::from( (input[0].clone() == input[1].clone()) as usize ),
+		SDIV => {
+			if input[1].clone() == num::BigInt::zero() {
+				num::BigInt::zero()
+			} else {
+				input[0].clone() / input[1].clone()
+			}
+		}
+		_ => panic!("Don't have the logic enabled for {}", OPCODES[opcode as usize].name)
+	}
+}
 /// Virtual machine bytecode instruction.
 /// halts execution
 pub const STOP: Instruction = 0x00;

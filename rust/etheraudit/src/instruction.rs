@@ -6,6 +6,8 @@ use op_codes;
 use std::rc::Rc;
 
 use expression;
+use std::borrow::Borrow;
+use num;
 
 pub type InstructionInputs = program::EvmStack;
 pub type InstructionOutputs = program::EvmStack;
@@ -40,6 +42,18 @@ impl Instruction {
                 let info = op_codes::OPCODES[self.op_code as usize];
                 assert!(info.ret <= 1);
 
+                if op_codes::is_arithmetic(self.op_code) {
+                    let inputs: Option<std::vec::Vec<num::BigInt>> =
+                        self.inputs.iter().map(
+                            |x| if let expression::Expression::Constant(ref v) = *x.borrow() { Some(v.clone()) } else { None })
+                            .collect();
+
+                    if let Some(inputs) = inputs {
+                        self.outputs = vec![ Rc::new( expression::Expression::Constant(op_codes::solve(self.op_code, &inputs)))];
+                        return;
+                    }
+                }
+
                 if info.ret == 0 {
                     self.outputs = vec![]
                 } else
@@ -49,6 +63,7 @@ impl Instruction {
             }
         }
     }
+
     pub fn from_stack(in_offset: &mut usize,
                       byte_code: &[u8],
                       stack: &mut program::EvmStack, arg_count: &mut usize) -> Self {

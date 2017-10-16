@@ -56,8 +56,15 @@ fn process_program(p: &Program) {
                 }
             }
         }
-
         println!();
+    }
+
+    for (pos, expr) in &p.op_trees {
+        if let expression::OpTree::Operation(op_code, _) = *expr {
+            if !op_codes::is_stack_manip_only(op_code) {
+                println!("{}\t{}", pos, expr);
+            }
+        }
     }
 
     use expression::OpTree;
@@ -65,8 +72,10 @@ fn process_program(p: &Program) {
         OpTree::Constant(BigInt::from(2)), OpTree::Query("condition".to_string())
     ]);
 
-    for r in p.query(&assert_query) {
-        println!("{:?}", r);
+    for (pos, r) in p.query(&assert_query) {
+        for (name, tree) in r {
+            println!("{} {}", name, tree);
+        }
     }
 }
 
