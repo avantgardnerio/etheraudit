@@ -4,14 +4,17 @@ use std::collections::hash_map::HashMap;
 use instruction::*;
 use std;
 use self::num::bigint::BigInt;
-use expression::num::Zero;
 use op_codes;
 use program;
+use num::ToPrimitive;
+use std::ops::Deref;
 
+#[derive(Clone)]
 pub enum Expression {
     Constant(BigInt),
     Argument(usize),
-    ResultOf(usize)
+    ResultOf(usize),
+    Negate(Box<Expression>)
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +57,7 @@ impl OpTree {
             (_, &OpTree::Query(ref n)) => {
                 Some( [(n.clone(), self.clone())].iter().cloned().collect() )
             },
-            (&OpTree::Query(ref n), _) => {
+            (&OpTree::Query(_), _) => {
                 panic!("Query should be on the rhs")
             },
             (&OpTree::Operation(self_op, ref self_in),
@@ -98,7 +101,8 @@ impl OpTree {
         match *expr {
             Expression::Constant(ref v) => OpTree::Constant(v.clone()),
             Expression::Argument(idx) => OpTree::Argument(idx),
-            Expression::ResultOf(offset) => OpTree::create_from_instr(p, &p.instructions[&offset])
+            Expression::ResultOf(offset) => OpTree::create_from_instr(p, &p.instructions[&offset]),
+            Expression::Negate(ref expr) => OpTree::Operation(op_codes::NOT, vec![ OpTree::create(p, expr.deref())])
         }
     }
 }
@@ -117,12 +121,32 @@ pub fn make_constant(data: &[u8]) -> Expression {
     Expression::Constant(c)
 }
 
+pub fn eval_as_bool(expr: &Expression) -> Option<bool> {
+    match expr {
+        &Expression::Constant(ref v) => Some(v.gt(&BigInt::default())),
+        &Expression::Negate(ref expr) => eval_as_bool(expr).map(|x|!x),
+        _ => None
+    }
+}
+
+pub fn negate(expr: &Expression) -> Expression {
+    Expression::Negate(Box::new(expr.clone()))
+}
+
+pub fn make_true() -> Expression {
+    return Expression::Constant( BigInt::from(1));
+}
+pub fn make_false() -> Expression {
+    return Expression::Constant( BigInt::from(0));
+}
+
 impl std::fmt::Debug for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Expression::Constant(ref v) => write!(f, "{:?}", make_vec(&v)),
             Expression::Argument(idx) => write!(f, "<argument.{}>", idx),
-            Expression::ResultOf(offset) => write!(f, "<#{}>", offset)
+            Expression::ResultOf(offset) => write!(f, "<#{}>", offset),
+            Expression::Negate(ref expr) => write!(f, "!({:?})", expr.deref())
         }
     }
 }

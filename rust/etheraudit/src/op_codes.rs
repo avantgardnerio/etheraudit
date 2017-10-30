@@ -150,6 +150,34 @@ pub fn get_tier_idx (tier: GasPriceTier) -> usize {
 	}
 }
 
+pub fn get_gas_price(instr: Instruction) -> usize {
+	// https://ethereum.github.io/yellowpaper/paper.pdf -- Appendix G
+	let opcode = OPCODES[instr as usize];
+	match opcode.tier {
+		GasPriceTier::Zero => 0,
+		GasPriceTier::Base => 2,
+		GasPriceTier::VeryLow => 3,
+		GasPriceTier::Low => 5,
+		GasPriceTier::Mid => 8,
+		GasPriceTier::High => 10,
+		GasPriceTier::Invalid => 0,
+		_ => {
+			match instr {
+				EXTCODECOPY | EXTCODESIZE => 700,
+				BALANCE => 400,
+				SLOAD => 200,
+				JUMPDEST => 1,
+				SSTORE => 5000,
+				EXP => 10,
+				SHA3 => 30,
+				LOG1 ... LOG4 => 375,
+				CALL => 700,
+				SUICIDE => 0,
+				_ => panic!("Please add instruction to listing {} {:#x}", OPCODES[instr as usize].name, instr)
+			}
+		}
+	}
+}
 /// EVM instruction information.
 #[derive(Copy, Clone, Default)]
 pub struct OpCodeInfo {
@@ -181,7 +209,7 @@ lazy_static! {
 	/// Static instruction table.
 	pub static ref OPCODES: [OpCodeInfo; 0x100] = {
 		let mut arr : [OpCodeInfo; 0x100] = (0..0x100).map(|i|{
-		     OpCodeInfo::new("", i as u8, 0, 0, GasPriceTier::Special)
+		     OpCodeInfo::new("", i as u8, 0, 0, GasPriceTier::Invalid)
 		}).collect::<ArrayVec<_>>().into_inner()
         .unwrap_or_else(|_| unreachable!());
 

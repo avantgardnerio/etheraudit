@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate lazy_static;
 extern crate num;
+
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -12,11 +13,10 @@ mod instruction;
 mod block;
 mod program;
 mod expression;
-use std::rc::Rc;
+mod memory;
 
 use program::*;
 use num::bigint::BigInt;
-use num::Zero;
 
 fn parse_byte_code(str: &str) -> ByteCode {
     let mut byte_code: ByteCode = std::vec::Vec::new();
@@ -45,8 +45,30 @@ fn read_file(file_name: &str) -> Program {
 }
 
 fn process_program(p: &Program) {
-    for block in p.blocks.values() {
-        println!("Block {} {}", block.start, block.end);
+    for block_ptr in p.blocks() {
+        let block = block_ptr.get();
+
+        if !block.reachable {
+            continue;
+        }
+        println!("Block {} {} Gas cost: {}", block.start, block.end, block.gas_price);
+
+        print!("Can exit to: ");
+        for to in block.exits() {
+            print!("{} ", to.get().start);
+        }
+        println!();
+
+        print!("Can enter from: ");
+        for to in block.entries() {
+            print!("{} ", to.get().start);
+        }
+        println!();
+
+        if block.dynamic_jump {
+            println!("Has dynamic jumps");
+        }
+
         for pos in block.start..block.end {
             if let Some(instr) = p.instructions.get(&pos) {
                 if !op_codes::is_stack_manip_only(instr.op_code) {
@@ -59,6 +81,7 @@ fn process_program(p: &Program) {
         println!();
     }
 
+    /*
     for (pos, expr) in &p.op_trees {
         if let expression::OpTree::Operation(op_code, _) = *expr {
             if !op_codes::is_stack_manip_only(op_code) {
@@ -72,11 +95,12 @@ fn process_program(p: &Program) {
         OpTree::Constant(BigInt::from(2)), OpTree::Query("condition".to_string())
     ]);
 
-    for (pos, r) in p.query(&assert_query) {
+    for (_, r) in p.query(&assert_query) {
         for (name, tree) in r {
             println!("{} {}", name, tree);
         }
     }
+    */
 }
 
 fn main() {
